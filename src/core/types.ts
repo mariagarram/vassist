@@ -16,6 +16,8 @@ export interface Channel {
   sendText(to: string, text: string): Promise<void>;
   sendButtons(to: string, body: string, buttons: Button[]): Promise<void>;
   sendList(to: string, body: string, label: string, rows: Row[]): Promise<void>;
+  /** Pregunta abierta con recuadro de respuesta (Telegram). Si el canal no lo tiene, se usa sendText. */
+  sendPrompt?(to: string, text: string, placeholder: string): Promise<void>;
 }
 
 export type OwnerAlert = { severity: "info" | "high" | "urgent"; text: string };

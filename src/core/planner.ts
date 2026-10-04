@@ -28,7 +28,7 @@ type Q = {
   ask: L2;
   opts: (c: Ctx) => Opt[];
   /** Fila «otro»: abre una pregunta de texto. */
-  other?: { label: L2; ask: L2 };
+  other?: { label: L2; ask: L2; placeholder: L2 };
   multi?: boolean;
 };
 
@@ -39,16 +39,15 @@ const QS: Q[] = [
     key: "destination",
     name: { en: "Destination", ar: "الوجهة" },
     ask: { en: "Where would you like to go?", ar: "إلى أين تودون السفر؟" },
-    opts: (c) =>
-      (c.recent.length ? c.recent : ["Madrid", "Paris", "London", "Istanbul"]).slice(0, 4).map((x) => o(x, x, x)),
-    other: { label: { en: "Another place", ar: "وجهة أخرى" }, ask: { en: "Please write the place: any city, town, region or country.", ar: "اكتبوا اسم المكان: أي مدينة أو بلدة أو منطقة أو دولة." } },
+    opts: () => [],
+    other: { label: { en: "Another place", ar: "وجهة أخرى" }, ask: { en: "Please write the place: any city, town, region or country.", ar: "اكتبوا اسم المكان: أي مدينة أو بلدة أو منطقة أو دولة." }, placeholder: { en: "City, town, region or country", ar: "مدينة أو بلدة أو منطقة أو دولة" } },
   },
   {
     key: "origin",
     name: { en: "Departing from", ar: "الانطلاق من" },
     ask: { en: "Where will you travel from?", ar: "من أين ستنطلقون؟" },
     opts: (c) => (typeof c.prefs.home_airport === "string" && c.prefs.home_airport ? [o(c.prefs.home_airport, `From ${c.prefs.home_airport}`, `من ${c.prefs.home_airport}`)] : []),
-    other: { label: { en: "Another place", ar: "مكان آخر" }, ask: { en: "Please write the city or airport you will depart from.", ar: "اكتبوا المدينة أو المطار الذي ستنطلقون منه." } },
+    other: { label: { en: "Another place", ar: "مكان آخر" }, ask: { en: "Please write the city or airport you will depart from.", ar: "اكتبوا المدينة أو المطار الذي ستنطلقون منه." }, placeholder: { en: "City or airport", ar: "المدينة أو المطار" } },
   },
   {
     key: "purpose",
@@ -73,7 +72,7 @@ const QS: Q[] = [
       o("in 2 to 3 months", "In 2 to 3 months", "خلال شهرين إلى ثلاثة"),
       o("flexible dates", "Flexible", "مواعيد مرنة"),
     ],
-    other: { label: { en: "Exact date", ar: "تاريخ محدد" }, ask: { en: "Please write the departure date, for example 2026-11-12.", ar: "اكتبوا تاريخ المغادرة، مثل 2026-11-12." } },
+    other: { label: { en: "Exact date", ar: "تاريخ محدد" }, ask: { en: "Please write the departure date, for example 2026-11-12.", ar: "اكتبوا تاريخ المغادرة، مثل 2026-11-12." }, placeholder: { en: "2026-11-12", ar: "2026-11-12" } },
   },
   {
     key: "length",
@@ -110,7 +109,7 @@ const QS: Q[] = [
       o("luxury", "Luxury", "فاخرة"),
       o("no limit", "No limit", "بلا حد"),
     ],
-    other: { label: { en: "Set an amount", ar: "تحديد مبلغ" }, ask: { en: "Please write your total budget with the currency, for example 3000 EUR.", ar: "اكتبوا إجمالي الميزانية مع العملة، مثل 3000 يورو." } },
+    other: { label: { en: "Set an amount", ar: "تحديد مبلغ" }, ask: { en: "Please write your total budget with the currency, for example 3000 EUR.", ar: "اكتبوا إجمالي الميزانية مع العملة، مثل 3000 يورو." }, placeholder: { en: "For example 3000 EUR", ar: "مثال: 3000 يورو" } },
   },
   {
     key: "transport",
@@ -147,7 +146,7 @@ const QS: Q[] = [
       o("vegetarian", "Vegetarian", "نباتي"),
       o("vegan", "Vegan", "نباتي صرف"),
     ],
-    other: { label: { en: "Other", ar: "غير ذلك" }, ask: { en: "Please write your dietary requirements.", ar: "اكتبوا متطلباتكم الغذائية." } },
+    other: { label: { en: "Other", ar: "غير ذلك" }, ask: { en: "Please write your dietary requirements.", ar: "اكتبوا متطلباتكم الغذائية." }, placeholder: { en: "Your dietary requirements", ar: "متطلباتكم الغذائية" } },
   },
   {
     key: "interests",
@@ -175,7 +174,7 @@ const QS: Q[] = [
     name: { en: "Notes", ar: "ملاحظات" },
     ask: { en: "Anything else I should know?", ar: "هل هناك شيء آخر يجب أن أعرفه؟" },
     opts: () => [o("", "No, that is all", "لا، هذا كل شيء")],
-    other: { label: { en: "Add a note", ar: "إضافة ملاحظة" }, ask: { en: "Please write your note.", ar: "اكتبوا ملاحظتكم." } },
+    other: { label: { en: "Add a note", ar: "إضافة ملاحظة" }, ask: { en: "Please write your note.", ar: "اكتبوا ملاحظتكم." }, placeholder: { en: "Your note", ar: "ملاحظتكم" } },
   },
 ];
 
@@ -259,7 +258,7 @@ export class Planner {
     // Sin opciones (p. ej. no hay aeropuerto guardado): se pregunta directamente por escrito.
     if (!all.length && q.other) {
       this.h.store.setWizard(user.id, { ...w, awaiting: true });
-      await this.h.channel.sendText(user.id, q.other.ask[lang]);
+      await this.prompt(user, q);
       return;
     }
     const list: Row[] = all.flatMap((x, idx) => (w.sel.includes(x.v) ? [] : [{ id: `p:${w.i}:${idx}`, title: clip(x[lang], 24) }]));
@@ -267,6 +266,14 @@ export class Planner {
     if (q.other && list.length < 10) list.push({ id: `p:${w.i}:o`, title: clip(q.other.label[lang], 24) });
     if (w.i >= 3 && list.length < 10) list.push({ id: `p:${w.i}:s`, title: tx.skip });
     await this.h.channel.sendList(user.id, `${w.i + 1}/${QS.length} · ${q.ask[lang]}`, tx.pick, list);
+  }
+
+  /** Pregunta abierta: con recuadro de respuesta si el canal lo permite. */
+  private async prompt(user: User, q: Q) {
+    const other = q.other;
+    if (!other) return;
+    if (this.h.channel.sendPrompt) await this.h.channel.sendPrompt(user.id, other.ask[user.lang], other.placeholder[user.lang]);
+    else await this.h.channel.sendText(user.id, other.ask[user.lang]);
   }
 
   private label(q: Q, value: string, lang: Lang): string {
@@ -367,7 +374,7 @@ export class Planner {
     }
     if (opt === "o" && q.other) {
       store.setWizard(user.id, { ...w, awaiting: true });
-      await channel.sendText(user.id, q.other.ask[user.lang]);
+      await this.prompt(user, q);
       return true;
     }
     if (opt === "d" && q.multi) {

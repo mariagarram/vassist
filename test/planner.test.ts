@@ -23,9 +23,8 @@ test("planificador: todo por botones, resumen, plan de la IA y botones de crear/
   const c = setup();
   await c.text("hello");
   await tap(c, "m:plan");
-  // 1 destino: lista con sugerencias y «otro»
-  assert.ok(ids(c).includes("p:0:o"));
-  await tap(c, "p:0:o");
+  // 1 destino: recuadro de texto (cualquier ciudad, pueblo o país)
+  assert.match(texts(c).at(-1)!, /write the place/);
   await c.text("Vejer de la Frontera");
   // 2 origen: sin aeropuerto guardado se pregunta por escrito
   assert.match(texts(c).at(-1)!, /depart from/);
@@ -69,7 +68,7 @@ test("planificador: escribir texto libre lo abandona y lo atiende la IA; saltar 
   const c = setup();
   await c.text("hello");
   await tap(c, "m:plan");
-  await pick(c, 0); // destino sugerido
+  await c.text("Madrid"); // destino por escrito
   await c.text("Rome"); // origen por escrito
   await pick(c, 0); // propósito
   c.llm.queue(say("Of course, a question for you."));
@@ -78,7 +77,7 @@ test("planificador: escribir texto libre lo abandona y lo atiende la IA; saltar 
   assert.equal(c.store.getWizard(CLIENT), null);
 
   await c.click("m:plan");
-  await pick(c, 0);
+  await c.text("Madrid");
   await c.text("Rome");
   await pick(c, 0);
   await pick(c, 0);
@@ -92,8 +91,7 @@ test("planificador en árabe: sale en árabe y los botones viejos no rompen nada
   const c = setup();
   await c.text("مرحبا");
   await c.click("m:plan");
-  const m = last(c);
-  assert.match(m.body, /إلى أين/);
+  assert.match(texts(c).at(-1)!, /اكتبوا اسم المكان/);
   await c.click("p:7:1"); // botón de otra pregunta: obsoleto
-  assert.match(texts(c).at(-1)!, /لم يعد متاحاً/);
+  assert.ok(texts(c).some((x) => /لم يعد متاحاً/.test(x)));
 });

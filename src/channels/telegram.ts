@@ -48,6 +48,15 @@ export class TelegramChannel implements Channel {
     return this.call("sendMessage", { chat_id: to, text: clip(text, 4096) }).then(() => undefined);
   }
 
+  /** Pregunta abierta: Telegram abre el teclado con una respuesta en blanco y el texto de ayuda (placeholder) en el recuadro. */
+  sendPrompt(to: string, text: string, placeholder: string) {
+    return this.call("sendMessage", {
+      chat_id: to,
+      text: clip(text, 4096),
+      reply_markup: { force_reply: true, input_field_placeholder: clip(placeholder, 64), selective: false },
+    }).then(() => undefined);
+  }
+
   /** Botones en línea, uno por fila (en el móvil se leen mejor que varios en una fila). */
   sendButtons(to: string, body: string, buttons: Button[]) {
     return this.call("sendMessage", {

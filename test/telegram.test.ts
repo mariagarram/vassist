@@ -55,3 +55,9 @@ test("un corte de red momentáneo se reintenta y un error de Telegram no", async
   await assert.rejects(new TelegramChannel({ token: "T", fetchImpl: down }).call("getMe"));
   assert.equal(m, 3);
 });
+
+test("sendPrompt: respuesta en blanco con texto de ayuda en el recuadro", async () => {
+  const { calls, impl } = fakeFetch();
+  await new TelegramChannel({ token: "T", fetchImpl: impl }).sendPrompt("555", "Where to?", "City, town, region or country");
+  assert.deepEqual(calls[0]!.body.reply_markup, { force_reply: true, input_field_placeholder: "City, town, region or country", selective: false });
+});
