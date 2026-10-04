@@ -1,5 +1,6 @@
 import { parseDate } from "./menu";
-import { iataFor, offsetFor, type HotelOption, type TravelProvider } from "./providers";
+import { T } from "./i18n";
+import { cityFor, iataFor, offsetFor, type FlightOption, type HotelOption, type TravelProvider } from "./providers";
 import type { Store, User } from "./store";
 import type { Channel, Lang, Row } from "./types";
 
@@ -20,6 +21,8 @@ export interface PlannerHost {
   providers: TravelProvider;
   /** Aprueba la propuesta como si el cliente hubiera pulsado «Aprobar»: avisa a María, que reserva y confirma. */
   approve(user: User, proposalId: string): Promise<void>;
+  /** Vuelve al menú principal. */
+  menu(user: User): Promise<void>;
 }
 
 type L2 = { en: string; ar: string; es?: string };
@@ -35,6 +38,8 @@ type Q = {
   /** Fila «otro»: abre una pregunta de texto. */
   other?: { label: L2; ask: L2; placeholder: L2 };
   multi?: boolean;
+  /** Pregunta básica: sin ella no se puede buscar. El resto son preferencias opcionales. */
+  core?: boolean;
 };
 
 const o = (v: string, en: string, ar: string): Opt => ({ v, en, ar });
@@ -72,6 +77,7 @@ export const untranslatedSpanish = (): string[] => {
 const QS: Q[] = [
   {
     key: "destination",
+    core: true,
     name: { en: "Destination", ar: "الوجهة" },
     ask: { en: "Where would you like to go?", ar: "إلى أين تودون السفر؟" },
     opts: () => [],
@@ -79,6 +85,7 @@ const QS: Q[] = [
   },
   {
     key: "origin",
+    core: true,
     name: { en: "Departing from", ar: "الانطلاق من" },
     ask: { en: "Where will you travel from?", ar: "من أين ستنطلقون؟" },
     opts: (c) => (typeof c.prefs.home_airport === "string" && c.prefs.home_airport ? [{ ...o(c.prefs.home_airport, `From ${c.prefs.home_airport}`, `من ${c.prefs.home_airport}`), es: `Desde ${c.prefs.home_airport}` }] : []),
@@ -98,6 +105,7 @@ const QS: Q[] = [
   },
   {
     key: "when",
+    core: true,
     name: { en: "When", ar: "الموعد" },
     ask: { en: "When would you like to travel?", ar: "متى تودون السفر؟" },
     opts: (c) => [
@@ -111,6 +119,7 @@ const QS: Q[] = [
   },
   {
     key: "length",
+    core: true,
     name: { en: "Nights", ar: "عدد الليالي" },
     ask: { en: "How many nights will you stay?", ar: "كم ليلة ستقيمون؟" },
     opts: () => [
@@ -124,6 +133,7 @@ const QS: Q[] = [
   },
   {
     key: "travellers",
+    core: true,
     name: { en: "Travellers", ar: "المسافرون" },
     ask: { en: "Who is travelling?", ar: "من سيسافر؟" },
     opts: () => [
@@ -249,6 +259,31 @@ const TX = {
     digitalKey: "digital key",
     km: "km from the centre",
     total: (n: number, eur: number) => `${n} night${n === 1 ? "" : "s"}: EUR ${eur}`,
+    hubHead: "Your trip",
+    hubAsk: "What would you like to do?",
+    rowFlights: "Flights",
+    rowStays: "Hotels and apartments",
+    rowFull: "Full plan with itinerary",
+    rowPrefs: "My travel preferences",
+    rowChange: "Change trip details",
+    rowReturn: "Return flight",
+    rowMenu: "Back to the menu",
+    rowMore: (n: number) => `More results (${n})`,
+    rowBackTrip: "Back to my trip",
+    changeAsk: "What would you like to change?",
+    badDate: "I could not read that date. Please use the format 2026-11-12, and a day in the future.",
+    badNights: "Please write a number of nights between 1 and 60.",
+    usual: (from: string, who: string) => `I am using your usual details: from ${from}, ${who}. You can change them at any time.`,
+    prefsStart: "A few optional questions so I can tailor your trips. I will remember your answers.",
+    flHead: (f: string, t: string, d: string) => `Flights from ${f} to ${t} on ${d}:`,
+    flHeadRet: (f: string, t: string, d: string) => `Return flights from ${f} to ${t} on ${d}:`,
+    flNone: "I found no flights for that day.",
+    flNoAirport: (place: string) => `I could not match an airport for ${place}. Please change the place to a city with an airport, or ask me for a train or car plan.`,
+    showing: (a: number, b: number, n: number) => `Showing ${a} to ${b} of ${n}, cheapest first.`,
+    direct: "direct",
+    stops: (n: number) => `${n} stop${n === 1 ? "" : "s"}`,
+    refundable: "refundable",
+    sampleFlight: "Sample data: schedules and prices are for testing until a live provider is connected.",
     sample: "Sample data: price, photo and map pin are for testing until a live provider is connected.",
   },
   es: {
@@ -284,6 +319,31 @@ const TX = {
     digitalKey: "llave digital",
     km: "km del centro",
     total: (n: number, eur: number) => `${n} noche${n === 1 ? "" : "s"}: EUR ${eur}`,
+    hubHead: "Su viaje",
+    hubAsk: "¿Qué quiere hacer?",
+    rowFlights: "Vuelos",
+    rowStays: "Hoteles y apartamentos",
+    rowFull: "Plan completo con itinerario",
+    rowPrefs: "Mis preferencias de viaje",
+    rowChange: "Cambiar datos del viaje",
+    rowReturn: "Vuelo de vuelta",
+    rowMenu: "Volver al menú",
+    rowMore: (n: number) => `Más resultados (${n})`,
+    rowBackTrip: "Volver a mi viaje",
+    changeAsk: "¿Qué quiere cambiar?",
+    badDate: "No he podido leer esa fecha. Use el formato 2026-11-12 y un día futuro.",
+    badNights: "Escriba un número de noches entre 1 y 60.",
+    usual: (from: string, who: string) => `Uso sus datos habituales: salida desde ${from}, ${who}. Puede cambiarlos cuando quiera.`,
+    prefsStart: "Unas preguntas opcionales para ajustar sus viajes. Recordaré sus respuestas.",
+    flHead: (f: string, t: string, d: string) => `Vuelos de ${f} a ${t} el ${d}:`,
+    flHeadRet: (f: string, t: string, d: string) => `Vuelos de vuelta de ${f} a ${t} el ${d}:`,
+    flNone: "No he encontrado vuelos para ese día.",
+    flNoAirport: (place: string) => `No he podido encontrar un aeropuerto para ${place}. Cambie el lugar por una ciudad con aeropuerto, o pídame un plan en tren o en coche.`,
+    showing: (a: number, b: number, n: number) => `Mostrando del ${a} al ${b} de ${n}, del más barato al más caro.`,
+    direct: "directo",
+    stops: (n: number) => `${n} escala${n === 1 ? "" : "s"}`,
+    refundable: "reembolsable",
+    sampleFlight: "Datos de muestra: los horarios y precios son de prueba hasta conectar un proveedor real.",
     sample: "Datos de muestra: el precio, la foto y el pin del mapa son de prueba hasta conectar un proveedor real.",
   },
   ar: {
@@ -319,20 +379,56 @@ const TX = {
     digitalKey: "مفتاح رقمي",
     km: "كم عن المركز",
     total: (n: number, eur: number) => `${n} ليلة: ${eur} يورو`,
+    hubHead: "رحلتكم",
+    hubAsk: "ماذا تودون أن تفعلوا؟",
+    rowFlights: "رحلات طيران",
+    rowStays: "فنادق وشقق",
+    rowFull: "خطة كاملة مع البرنامج",
+    rowPrefs: "تفضيلات السفر",
+    rowChange: "تغيير بيانات الرحلة",
+    rowReturn: "رحلة العودة",
+    rowMenu: "العودة إلى القائمة",
+    rowMore: (n: number) => `المزيد من النتائج (${n})`,
+    rowBackTrip: "العودة إلى رحلتي",
+    changeAsk: "ماذا تودون أن تغيّروا؟",
+    badDate: "لم أتمكن من قراءة هذا التاريخ. استخدموا الصيغة 2026-11-12 ويوماً في المستقبل.",
+    badNights: "اكتبوا عدد ليالٍ بين 1 و60.",
+    usual: (from: string, who: string) => `أستخدم بياناتكم المعتادة: الانطلاق من ${from}، ${who}. يمكنكم تغييرها في أي وقت.`,
+    prefsStart: "بعض الأسئلة الاختيارية لأخصّص رحلاتكم. سأتذكر إجاباتكم.",
+    flHead: (f: string, t: string, d: string) => `رحلات من ${f} إلى ${t} بتاريخ ${d}:`,
+    flHeadRet: (f: string, t: string, d: string) => `رحلات العودة من ${f} إلى ${t} بتاريخ ${d}:`,
+    flNone: "لم أجد رحلات لهذا اليوم.",
+    flNoAirport: (place: string) => `لم أتمكن من إيجاد مطار لـ ${place}. غيّروا المكان إلى مدينة فيها مطار، أو اطلبوا مني خطة بالقطار أو بالسيارة.`,
+    showing: (a: number, b: number, n: number) => `عرض ${a} إلى ${b} من ${n}، الأرخص أولاً.`,
+    direct: "مباشرة",
+    stops: (n: number) => `${n} توقف`,
+    refundable: "قابلة للاسترداد",
+    sampleFlight: "بيانات تجريبية: المواعيد والأسعار للاختبار إلى أن يُربط مزوّد حقيقي.",
     sample: "بيانات تجريبية: السعر والصورة وموقع الخريطة للاختبار إلى أن يُربط مزوّد حقيقي.",
   },
 };
 
-type State = { planner: true; i: number; a: Record<string, string>; sel: string[]; awaiting?: boolean };
+
+const CORE = QS.filter((q) => q.core).map((q) => q.key);
+const OPTIONAL = QS.filter((q) => !q.core).map((q) => q.key);
+/** Respuestas que se recuerdan para el siguiente viaje. El destino, la fecha y las noches se preguntan siempre. */
+const REMEMBER = ["origin", "travellers", "budget", "transport", "lodging", "food", "interests", "pace"];
+const BY_KEY: Record<string, Q> = Object.fromEntries(QS.map((q) => [q.key, q]));
+const PAGE = 8;
+
+type State = { planner: true; seq: string[]; i: number; a: Record<string, string>; sel: string[]; awaiting?: boolean; opt?: boolean };
+type Trip = { profile: Record<string, string>; cur?: Record<string, string> };
+type Stay = HotelOption & { checkIn: string; checkOut: string; nights: number };
+type FlightList = { dir: "out" | "ret"; from: string; to: string; date: string; items: FlightOption[] };
+type View = { kind: "flight" | "stay"; page: number; flights?: FlightList; stays?: Stay[]; city?: string };
 
 const clip = (s: string, n: number) => (s.length <= n ? s : `${s.slice(0, n - 1)}…`);
 
-type Stay = HotelOption & { checkIn: string; checkOut: string; nights: number };
-type StayCtx = { city: string; checkIn: string; nights: number; hotelsOnly: boolean; apartmentsFirst: boolean; minStars: number; shown: Stay[] };
-
 export class Planner {
-  /** Lo último que se mostró de hoteles y apartamentos, por cliente. Solo en memoria: si se reinicia, el botón pide repetir. */
-  private stays = new Map<string, StayCtx>();
+  /** Última lista mostrada (vuelos o alojamientos) por cliente. Solo en memoria: si se reinicia, se pide repetir la búsqueda. */
+  private views = new Map<string, View>();
+  /** Qué tramos de vuelo ya se han reservado en este viaje. */
+  private legs = new Map<string, { out?: boolean; ret?: boolean }>();
 
   constructor(private h: PlannerHost) {}
 
@@ -342,28 +438,38 @@ export class Planner {
   private today() {
     return this.h.now().toISOString().slice(0, 10);
   }
-
-  async start(user: User) {
-    this.h.store.setWizard(user.id, { planner: true, i: 0, a: {}, sel: [] } satisfies State);
-    await this.h.channel.sendText(user.id, TX[user.lang].start);
-    await this.ask(user);
+  private trip(user: User): Trip {
+    return this.h.store.getTrip<Trip>(user.id) ?? { profile: {} };
   }
-
   private state(user: User): State | null {
     const w = this.h.store.getWizard<Partial<State>>(user.id);
     return w?.planner ? (w as State) : null;
   }
 
-  /** Muestra la pregunta actual, o el resumen si ya no quedan. */
+  /** Empieza un viaje nuevo: solo pregunta lo básico que no se sabe ya. */
+  async start(user: User) {
+    const tx = TX[user.lang];
+    const trip = this.trip(user);
+    const a = { ...trip.profile };
+    this.views.delete(user.id);
+    this.legs.delete(user.id);
+    const seq = CORE.filter((k) => !a[k]);
+    this.h.store.setWizard(user.id, { planner: true, seq, i: 0, a, sel: [] } satisfies State);
+    await this.h.channel.sendText(user.id, tx.start);
+    if (a.origin && a.travellers) await this.h.channel.sendText(user.id, tx.usual(this.label(BY_KEY.origin!, a.origin, user.lang), this.label(BY_KEY.travellers!, a.travellers, user.lang)));
+    await this.ask(user);
+  }
+
   private async ask(user: User) {
     const w = this.state(user);
     if (!w) return;
-    const q = QS[w.i];
-    if (!q) return this.summary(user, w);
+    const key = w.seq[w.i];
+    const q = key ? BY_KEY[key] : undefined;
+    if (!q) return this.finishSeq(user, w);
     const tx = TX[user.lang];
     const lang = user.lang;
     const all = q.opts(this.ctx(user));
-    // Sin opciones (p. ej. no hay aeropuerto guardado): se pregunta directamente por escrito.
+    // Sin opciones (p. ej. destino): se pregunta directamente por escrito.
     if (!all.length && q.other) {
       this.h.store.setWizard(user.id, { ...w, awaiting: true });
       await this.prompt(user, q);
@@ -372,35 +478,61 @@ export class Planner {
     const list: Row[] = all.flatMap((x, idx) => (w.sel.includes(x.v) ? [] : [{ id: `p:${w.i}:${idx}`, title: clip(tr(x, lang), 24) }]));
     if (q.multi) list.unshift({ id: `p:${w.i}:d`, title: `✓ ${tx.done}${w.sel.length ? ` (${w.sel.length})` : ""}` });
     if (q.other && list.length < 10) list.push({ id: `p:${w.i}:o`, title: clip(tr(q.other.label, lang), 24) });
-    if (w.i >= 3 && list.length < 10) list.push({ id: `p:${w.i}:s`, title: tx.skip });
-    await this.h.channel.sendList(user.id, `${w.i + 1}/${QS.length} · ${tr(q.ask, lang)}`, tx.pick, list);
+    if (w.opt && list.length < 10) list.push({ id: `p:${w.i}:s`, title: tx.skip });
+    await this.h.channel.sendList(user.id, `${w.i + 1}/${w.seq.length} · ${tr(q.ask, lang)}`, tx.pick, list);
   }
 
   /** Pregunta abierta: con recuadro de respuesta si el canal lo permite. */
-  private async prompt(user: User, q: Q) {
+  private async prompt(user: User, q: Q, text?: string) {
     const other = q.other;
     if (!other) return;
-    if (this.h.channel.sendPrompt) await this.h.channel.sendPrompt(user.id, tr(other.ask, user.lang), tr(other.placeholder, user.lang));
-    else await this.h.channel.sendText(user.id, tr(other.ask, user.lang));
+    const ask = text ?? tr(other.ask, user.lang);
+    if (this.h.channel.sendPrompt) await this.h.channel.sendPrompt(user.id, ask, tr(other.placeholder, user.lang));
+    else await this.h.channel.sendText(user.id, ask);
   }
 
   private label(q: Q, value: string, lang: Lang): string {
-    // El resumen enseña la opción en el idioma del cliente cuando es una de las predefinidas.
     const found = q.opts({ user: { lang } as User, prefs: {}, recent: [], today: this.today() }).find((x) => x.v === value);
     return found ? tr(found, lang) : value;
   }
 
-  private async summary(user: User, w: State) {
-    const tx = TX[user.lang];
-    const lines = QS.map((q) => `• ${tr(q.name, user.lang)}: ${w.a[q.key] ? this.label(q, w.a[q.key]!, user.lang) : tx.notSet}`);
-    await this.h.channel.sendButtons(user.id, `${tx.summary}\n\n${lines.join("\n")}`, [
-      { id: "p:go", title: tx.go },
-      { id: "p:redo", title: tx.redo },
-      { id: "p:cancel", title: tx.cancel },
-    ]);
+  /** Terminadas las preguntas: se guardan las respuestas que se recuerdan y se muestra el panel del viaje. */
+  private async finishSeq(user: User, w: State) {
+    const trip = this.trip(user);
+    const profile = { ...trip.profile };
+    for (const k of REMEMBER) if (w.a[k]) profile[k] = w.a[k]!;
+    this.h.store.clearWizard(user.id);
+    const before = trip.cur ?? {};
+    // Si cambia el destino, la fecha o las noches, las listas anteriores ya no valen.
+    if (["destination", "when", "length", "origin"].some((k) => before[k] !== w.a[k])) this.views.delete(user.id);
+    this.h.store.setTrip(user.id, { profile, cur: w.a } satisfies Trip);
+    await this.hub(user);
   }
 
-  /** Texto escrito mientras el planificador espera «otro». false: no era para el planificador. */
+  /** Panel del viaje: los datos y lo que se puede hacer ahora. */
+  async hub(user: User) {
+    const trip = this.trip(user);
+    const a = trip.cur;
+    if (!a?.destination) return this.start(user);
+    const tx = TX[user.lang];
+    const lines = CORE.map((k) => {
+      const q = BY_KEY[k]!;
+      return `• ${tr(q.name, user.lang)}: ${a[k] ? this.label(q, a[k]!, user.lang) : tx.notSet}`;
+    });
+    const legs = this.legs.get(user.id) ?? {};
+    const rows: Row[] = [
+      { id: "p:fl", title: tx.rowFlights },
+      ...(legs.out && !legs.ret ? [{ id: "p:rt", title: tx.rowReturn }] : []),
+      { id: "p:st", title: tx.stays },
+      { id: "p:go", title: tx.rowFull },
+      { id: "p:pf", title: tx.rowPrefs },
+      { id: "p:ch", title: tx.rowChange },
+      { id: "p:menu", title: tx.rowMenu },
+    ];
+    await this.h.channel.sendList(user.id, `${tx.hubHead}\n\n${lines.join("\n")}\n\n${tx.hubAsk}`, tx.pick, rows);
+  }
+
+  /** Texto escrito mientras el planificador espera una respuesta abierta. false: no era para el planificador. */
   async onText(user: User, text: string): Promise<boolean> {
     const w = this.state(user);
     if (!w) return false;
@@ -409,13 +541,25 @@ export class Planner {
       this.h.store.clearWizard(user.id);
       return false;
     }
-    const q = QS[w.i];
+    const q = BY_KEY[w.seq[w.i] ?? ""];
     if (!q) return false;
+    const tx = TX[user.lang];
     let value = clip(text.trim(), 200);
-    if (q.key === "when") value = parseDate(value, this.today()) ?? value;
+    if (q.key === "when") {
+      const iso = parseDate(value, this.today());
+      if (!iso) {
+        await this.prompt(user, q, tx.badDate);
+        return true;
+      }
+      value = iso;
+    }
     if (q.key === "length") {
       const n = Number.parseInt(value, 10);
-      if (Number.isInteger(n) && n >= 1 && n <= 60) value = String(n);
+      if (!Number.isInteger(n) || n < 1 || n > 60) {
+        await this.prompt(user, q, tx.badNights);
+        return true;
+      }
+      value = String(n);
     }
     await this.record(user, w, q, value);
     return true;
@@ -445,49 +589,87 @@ export class Planner {
     const tx = TX[user.lang];
     const { store, channel } = this.h;
     const arg = parts[1] ?? "";
+    const idx = Number(parts[2]);
 
-    if (arg === "make") {
-      await this.h.runText(user, tx.makeText);
-      return true;
-    }
-    if (arg === "adj") {
-      await channel.sendText(user.id, tx.adjustAsk);
-      return true;
-    }
-    if (arg === "cancel") {
-      store.clearWizard(user.id);
-      await channel.sendText(user.id, tx.cancelled);
-      return true;
-    }
-    if (arg === "st" || arg === "bl") return this.showStays(user);
-    if (arg === "b") return this.showStay(user, Number(parts[2]));
-    if (arg === "bk") return this.bookStay(user, Number(parts[2]));
-    if (arg === "redo") {
-      await this.start(user);
-      return true;
+    switch (arg) {
+      case "make":
+        await this.h.runText(user, tx.makeText);
+        return true;
+      case "adj":
+        await channel.sendText(user.id, tx.adjustAsk);
+        return true;
+      case "hub":
+        await this.hub(user);
+        return true;
+      case "menu":
+        store.clearWizard(user.id);
+        await this.h.menu(user);
+        return true;
+      case "cancel":
+        store.clearWizard(user.id);
+        await channel.sendText(user.id, tx.cancelled);
+        return true;
+      case "go":
+        return this.fullPlan(user);
+      case "pf": {
+        const trip = this.trip(user);
+        store.setWizard(user.id, { planner: true, seq: OPTIONAL, i: 0, a: { ...trip.profile, ...(trip.cur ?? {}) }, sel: [], opt: true } satisfies State);
+        await channel.sendText(user.id, tx.prefsStart);
+        await this.ask(user);
+        return true;
+      }
+      case "ch": {
+        const a = this.trip(user).cur ?? {};
+        await channel.sendList(
+          user.id,
+          tx.changeAsk,
+          tx.pick,
+          CORE.map((k) => ({ id: `p:c:${k}`, title: clip(tr(BY_KEY[k]!.name, user.lang), 24), description: clip(a[k] ? this.label(BY_KEY[k]!, a[k]!, user.lang) : tx.notSet, 72) })),
+        );
+        return true;
+      }
+      case "c": {
+        const key = parts[2] ?? "";
+        if (!CORE.includes(key)) return this.stale(user);
+        store.setWizard(user.id, { planner: true, seq: [key], i: 0, a: { ...(this.trip(user).cur ?? {}) }, sel: [] } satisfies State);
+        await this.ask(user);
+        return true;
+      }
+      case "fl":
+        return this.showFlights(user, "out");
+      case "rt":
+        return this.showFlights(user, "ret");
+      case "st":
+        return this.showStays(user);
+      case "mo": {
+        const v = this.views.get(user.id);
+        if (!v) return this.staleResults(user);
+        v.page += 1;
+        return v.kind === "flight" ? this.sendFlights(user) : this.sendStays(user);
+      }
+      case "bl": {
+        const v = this.views.get(user.id);
+        if (!v) return this.staleResults(user);
+        return v.kind === "flight" ? this.sendFlights(user) : this.sendStays(user);
+      }
+      case "f":
+        return this.showFlight(user, idx);
+      case "fk":
+        return this.bookFlight(user, idx);
+      case "b":
+        return this.showStay(user, idx);
+      case "bk":
+        return this.bookStay(user, idx);
     }
 
     const w = this.state(user);
-    if (arg === "go") {
-      if (!w) return this.stale(user);
-      store.clearWizard(user.id);
-      this.rememberStays(user, w);
-      await channel.sendText(user.id, tx.working);
-      await this.h.runBrief(user, this.brief(w, user.lang));
-      return true;
-    }
-
     const i = Number(arg);
     const opt = parts[2] ?? "";
     if (!w || !Number.isInteger(i) || i !== w.i) return this.stale(user);
-    const q = QS[i];
+    const q = BY_KEY[w.seq[i] ?? ""];
     if (!q) return this.stale(user);
 
-    if (opt === "s") {
-      store.setWizard(user.id, { ...w, i: QS.length, sel: [], awaiting: false });
-      await this.ask(user);
-      return true;
-    }
+    if (opt === "s") return this.finishSeq(user, w), true;
     if (opt === "o" && q.other) {
       store.setWizard(user.id, { ...w, awaiting: true });
       await this.prompt(user, q);
@@ -504,81 +686,175 @@ export class Planner {
   }
 
   private async stale(user: User) {
-    const tx = TX[user.lang];
-    await this.h.channel.sendText(user.id, tx.stale);
-    const w = this.state(user);
-    if (w) await this.ask(user);
+    await this.h.channel.sendText(user.id, TX[user.lang].stale);
+    if (this.state(user)) await this.ask(user);
+    else await this.hub(user);
     return true;
   }
 
-  private rememberStays(user: User, w: State) {
-    const a = w.a;
-    const lodging = a.lodging ?? "";
-    const city = (a.destination ?? "").trim();
-    const nights = Number.parseInt(a.length ?? "", 10);
-    if (!city || !lodging || lodging.includes("no accommodation") || !Number.isInteger(nights) || nights < 1) {
-      this.stays.delete(user.id);
-      return;
-    }
-    // Sin fecha concreta, se ofrece a dos semanas vista y la lista lo dice con la fecha.
-    const checkIn = /^\d{4}-\d{2}-\d{2}$/.test(a.when ?? "") ? a.when! : addDays(this.today(), 14);
-    const stars = /(\d)-star/.exec(lodging);
-    this.stays.set(user.id, {
-      city,
-      checkIn,
-      nights,
-      hotelsOnly: false,
-      apartmentsFirst: lodging === "apartment",
-      minStars: stars ? Number(stars[1]) : 3,
-      shown: [],
-    });
+  private async staleResults(user: User) {
+    await this.h.channel.sendText(user.id, TX[user.lang].staysGone);
+    await this.hub(user);
+    return true;
   }
 
-  /** Lista de hoteles y apartamentos reservables con un toque. */
-  private async showStays(user: User) {
+  private nights(a: Record<string, string>) {
+    const n = Number.parseInt(a.length ?? "", 10);
+    return Number.isInteger(n) && n > 0 ? n : 1;
+  }
+
+  // ---- vuelos ----
+  private async showFlights(user: User, dir: "out" | "ret") {
     const tx = TX[user.lang];
-    const ctx = this.stays.get(user.id);
-    if (!ctx) {
-      await this.h.channel.sendText(user.id, tx.staysGone);
+    const a = this.trip(user).cur;
+    if (!a?.destination) return this.stale(user);
+    const outPlace = dir === "out" ? a.origin : a.destination;
+    const inPlace = dir === "out" ? a.destination : a.origin;
+    const from = iataFor(outPlace ?? "");
+    const to = iataFor(inPlace ?? "");
+    if (!from || !to) {
+      await this.h.channel.sendText(user.id, tx.flNoAirport(!from ? (outPlace ?? "?") : (inPlace ?? "?")));
+      await this.hub(user);
       return true;
     }
+    const date = dir === "out" ? a.when! : addDays(a.when!, this.nights(a));
     const prefs = this.h.store.getPrefs(user.id);
-    const checkOut = addDays(ctx.checkIn, ctx.nights);
+    const lower = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x).toLowerCase()) : []);
+    const preferred = lower(prefs.preferred_airlines);
+    const avoid = lower(prefs.avoid_airlines);
+    const rank = (f: FlightOption) => (preferred.includes(f.airline.toLowerCase()) ? 0 : avoid.includes(f.airline.toLowerCase()) ? 2 : 1);
+    const found = await this.h.providers.searchFlights({ from, to, date });
+    const items = [...found].sort((x, y) => rank(x) - rank(y) || x.priceEur - y.priceEur);
+    if (!items.length) {
+      await this.h.channel.sendText(user.id, tx.flNone);
+      await this.hub(user);
+      return true;
+    }
+    this.views.set(user.id, { kind: "flight", page: 0, flights: { dir, from, to, date, items } });
+    return this.sendFlights(user);
+  }
+
+  private async sendFlights(user: User) {
+    const tx = TX[user.lang];
+    const v = this.views.get(user.id);
+    const fl = v?.flights;
+    if (!v || !fl) return this.staleResults(user);
+    const start = v.page * PAGE;
+    const slice = fl.items.slice(start, start + PAGE);
+    const rows: Row[] = slice.map((f, i) => ({
+      id: `p:f:${start + i}`,
+      title: clip(`${f.airline} ${f.departure.slice(11, 16)}`, 24),
+      description: `EUR ${f.priceEur} · ${f.stops === 0 ? tx.direct : tx.stops(f.stops)}${f.refundable ? ` · ${tx.refundable}` : ""}`,
+    }));
+    const left = fl.items.length - (start + slice.length);
+    if (left > 0) rows.push({ id: "p:mo", title: tx.rowMore(left) });
+    rows.push({ id: "p:hub", title: tx.rowBackTrip });
+    const head = (fl.dir === "out" ? tx.flHead : tx.flHeadRet)(fl.from, fl.to, fl.date);
+    await this.h.channel.sendList(user.id, `${head}\n${tx.showing(start + 1, start + slice.length, fl.items.length)}`, tx.pick, rows);
+    return true;
+  }
+
+  private async showFlight(user: User, idx: number) {
+    const tx = TX[user.lang];
+    const fl = this.views.get(user.id)?.flights;
+    const f = fl?.items[idx];
+    if (!fl || !f) return this.staleResults(user);
+    const body = [
+      `${f.airline} · ${f.from} → ${f.to}`,
+      `${f.departure.slice(0, 10)} · ${f.departure.slice(11, 16)} → ${f.arrival.slice(11, 16)}`,
+      `EUR ${f.priceEur} · ${f.stops === 0 ? tx.direct : tx.stops(f.stops)}${f.refundable ? ` · ${tx.refundable}` : ""}`,
+      tx.sampleFlight,
+    ].join("\n");
+    await this.h.channel.sendButtons(user.id, body, [
+      { id: `p:fk:${idx}`, title: tx.book },
+      { id: "p:bl", title: tx.back },
+    ]);
+    return true;
+  }
+
+  private async bookFlight(user: User, idx: number) {
+    const { store } = this.h;
+    const v = this.views.get(user.id);
+    const fl = v?.flights;
+    const f = fl?.items[idx];
+    if (!v || !fl || !f) return this.staleResults(user);
+    const plan = store.openPlan(user.id) ?? store.createPlan(user.id, `${cityFor(fl.to)} ${fl.date}`);
+    const proposal = store.createProposal({
+      planId: plan.id,
+      userId: user.id,
+      kind: "flight",
+      title: T[user.lang].menu.flightTitle(f.from, f.to, fl.date, f.airline),
+      details: `${f.departure.slice(11, 16)} - ${f.arrival.slice(11, 16)} · ${f.stops === 0 ? "direct" : `${f.stops} stop(s)`}${f.refundable ? " · refundable" : ""}`,
+      amountEur: f.priceEur,
+      attrs: { airline: f.airline, stops: f.stops, refundable: f.refundable, city: cityFor(f.to), starts_at: `${f.departure}:00${offsetFor(f.from)}` },
+    });
+    // Un segundo toque sobre «Reservar» no debe crear otra reserva.
+    fl.items[idx] = undefined as unknown as FlightOption;
+    const legs = this.legs.get(user.id) ?? {};
+    legs[fl.dir] = true;
+    this.legs.set(user.id, legs);
+    await this.h.approve(user, proposal.id);
+    await this.hub(user);
+    return true;
+  }
+
+  // ---- hoteles y apartamentos ----
+  private async showStays(user: User) {
+    const tx = TX[user.lang];
+    const a = this.trip(user).cur;
+    if (!a?.destination) return this.stale(user);
+    const lodging = a.lodging ?? "";
+    const city = a.destination;
+    const nights = this.nights(a);
+    const checkIn = a.when!;
+    const checkOut = addDays(checkIn, nights);
+    const prefs = this.h.store.getPrefs(user.id);
+    const stars = /(\d)-star/.exec(lodging);
     const found = await this.h.providers.searchHotels({
-      city: ctx.city,
-      checkIn: ctx.checkIn,
+      city,
+      checkIn,
       checkOut,
-      minStars: ctx.minStars,
+      minStars: stars ? Number(stars[1]) : 3,
       onlineCheckinOnly: prefs.require_online_checkin === true,
       includeApartments: true,
     });
-    const list = [...found].sort(
-      (a, b) =>
-        Number(ctx.apartmentsFirst ? b.type === "apartment" : false) - Number(ctx.apartmentsFirst ? a.type === "apartment" : false) ||
-        a.pricePerNightEur - b.pricePerNightEur,
-    );
-    ctx.shown = list.slice(0, 6).map((h) => ({ ...h, checkIn: ctx.checkIn, checkOut, nights: ctx.nights }));
-    if (!ctx.shown.length) {
+    const apartmentsFirst = lodging === "apartment";
+    const items = [...found]
+      .sort((x, y) => Number(apartmentsFirst && y.type === "apartment") - Number(apartmentsFirst && x.type === "apartment") || x.pricePerNightEur - y.pricePerNightEur)
+      .map((h) => ({ ...h, checkIn, checkOut, nights }));
+    if (!items.length) {
       await this.h.channel.sendText(user.id, tx.staysNone);
+      await this.hub(user);
       return true;
     }
-    await this.h.channel.sendList(
-      user.id,
-      `${tx.staysHead(ctx.city, ctx.nights, ctx.checkIn)}\n${tx.sample}`,
-      tx.pick,
-      ctx.shown.map((h, i) => ({
-        id: `p:b:${i}`,
-        title: clip(h.name, 24),
-        description: `EUR ${h.pricePerNightEur} ${tx.perNight} · ${h.type === "apartment" ? tx.apartment : `${h.stars}★`}`,
-      })),
-    );
+    this.views.set(user.id, { kind: "stay", page: 0, stays: items, city });
+    return this.sendStays(user);
+  }
+
+  private async sendStays(user: User) {
+    const tx = TX[user.lang];
+    const v = this.views.get(user.id);
+    if (!v?.stays) return this.staleResults(user);
+    const first = v.stays[0];
+    const start = v.page * PAGE;
+    const slice = v.stays.slice(start, start + PAGE);
+    const rows: Row[] = slice.map((h, i) => ({
+      id: `p:b:${start + i}`,
+      title: clip(h.name, 24),
+      description: `EUR ${h.pricePerNightEur} ${tx.perNight} · ${h.type === "apartment" ? tx.apartment : `${h.stars}★`}`,
+    }));
+    const left = v.stays.length - (start + slice.length);
+    if (left > 0) rows.push({ id: "p:mo", title: tx.rowMore(left) });
+    rows.push({ id: "p:hub", title: tx.rowBackTrip });
+    const head = tx.staysHead(v.city ?? "", first?.nights ?? 1, first?.checkIn ?? "");
+    await this.h.channel.sendList(user.id, `${head}\n${tx.showing(start + 1, start + slice.length, v.stays.length)}\n${tx.sample}`, tx.pick, rows);
     return true;
   }
 
   private async showStay(user: User, idx: number) {
     const tx = TX[user.lang];
-    const h = this.stays.get(user.id)?.shown[idx];
-    if (!h) return this.staleStays(user);
+    const h = this.views.get(user.id)?.stays?.[idx];
+    if (!h) return this.staleResults(user);
     const total = h.pricePerNightEur * h.nights;
     const extras = [h.freeCancellation ? tx.freeCancel : "", h.onlineCheckin ? tx.onlineCheckin : "", h.digitalKey ? tx.digitalKey : ""].filter(Boolean).join(" · ");
     const body = [
@@ -612,12 +888,12 @@ export class Planner {
     return true;
   }
 
-  /** «Reservar»: crea la propuesta y la aprueba. El aviso a María con /confirm lo envía el flujo de aprobación. */
+  /** «Reservar»: crea la propuesta y la aprueba. Después, reserva automática o aviso a María según el tipo (lo decide el flujo de aprobación). */
   private async bookStay(user: User, idx: number) {
-    const tx = TX[user.lang];
     const { store } = this.h;
-    const h = this.stays.get(user.id)?.shown[idx];
-    if (!h) return this.staleStays(user);
+    const v = this.views.get(user.id);
+    const h = v?.stays?.[idx];
+    if (!v?.stays || !h) return this.staleResults(user);
     const offset = offsetFor(iataFor(h.city) ?? "");
     const plan = store.openPlan(user.id) ?? store.createPlan(user.id, `${h.city} ${h.checkIn}`);
     const proposal = store.createProposal({
@@ -636,25 +912,39 @@ export class Planner {
         ends_at: `${h.checkOut}T11:00:00${offset}`,
       },
     });
-    // Un segundo toque sobre «Reservar» no debe crear otra reserva.
-    this.stays.get(user.id)!.shown[idx] = undefined as unknown as Stay;
+    v.stays[idx] = undefined as unknown as Stay;
     await this.h.approve(user, proposal.id);
+    await this.hub(user);
     return true;
   }
 
-  private async staleStays(user: User) {
-    await this.h.channel.sendText(user.id, TX[user.lang].staysGone);
+  // ---- plan completo con la IA ----
+  private async fullPlan(user: User) {
+    const tx = TX[user.lang];
+    const a = this.trip(user).cur;
+    if (!a?.destination) return this.stale(user);
+    await this.h.channel.sendText(user.id, tx.working);
+    await this.h.runBrief(user, this.brief(a, user.lang));
     return true;
+  }
+
+  /** Datos ya conocidos del viaje, para que la IA no vuelva a preguntarlos. Vacío si no hay viaje. */
+  tripContext(userId: string): string {
+    const trip = this.h.store.getTrip<Trip>(userId);
+    const a = trip?.cur;
+    if (!a?.destination) return "";
+    const lines = QS.filter((q) => a[q.key]).map((q) => `- ${q.name.en}: ${a[q.key]}`);
+    return `known_trip_details (already given by the client with the menu; never ask for them again, use them):\n${lines.join("\n")}`;
   }
 
   /** Formulario completo para la IA, en inglés (la IA responde en el idioma del cliente). */
-  private brief(w: State, lang: Lang): string {
-    const lines = QS.map((q) => `- ${q.name.en}: ${w.a[q.key] || "not specified"}`);
+  private brief(a: Record<string, string>, lang: Lang): string {
+    const lines = QS.map((q) => `- ${q.name.en}: ${a[q.key] || "not specified"}`);
     return [
-      `[Trip planner form completed by the client with the menu. Reply language: ${lang}. Today is ${this.today()}. Do not ask these questions again.]`,
+      `[Trip details given by the client with the menu. Reply language: ${lang}. Today is ${this.today()}. These details are final: do not ask for any of them again.]`,
       ...lines,
       "",
-      "Please write the plan now: route and mode, a short day-by-day outline (morning, afternoon, evening) with restaurant and activity suggestions that fit the interests, pace and food needs, and an estimated cost breakdown against the budget level (mark every figure as an estimate). Use the search tool for flights when it applies and an origin and date are clear. Do not list specific hotels or apartments or prices for them: the menu offers real bookable stays right after the plan, so only recommend the best area to stay. Ask a question only if something essential is missing. Keep it concise for a phone. Do not create proposals yet: the client will tap a button to confirm.",
+      "Please write the plan now: route and mode, a short day-by-day outline (morning, afternoon, evening) with restaurant and activity suggestions that fit the interests, pace and food needs, and an estimated cost breakdown against the budget level (mark every figure as an estimate). Do not search for or list specific flights, hotels or apartments, and do not give prices for them: the client uses the Flights and Hotels buttons for real bookable options, so only mention the best area to stay and the best way to travel. Keep it concise for a phone. Do not create proposals yet: the client will tap a button to confirm.",
     ].join("\n");
   }
 
@@ -662,9 +952,9 @@ export class Planner {
   async afterPlan(user: User) {
     const tx = TX[user.lang];
     await this.h.channel.sendButtons(user.id, tx.afterPlan, [
-      ...(this.stays.has(user.id) ? [{ id: "p:st", title: tx.stays }] : []),
       { id: "p:make", title: tx.make },
       { id: "p:adj", title: tx.adjust },
+      { id: "p:hub", title: tx.rowBackTrip },
     ]);
   }
 }

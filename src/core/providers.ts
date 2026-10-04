@@ -57,18 +57,19 @@ function seeded(seed: string) {
 
 const AIRLINES = ["Iberia", "Saudia", "Lufthansa", "Air France", "KLM", "British Airways", "Emirates"];
 const HOTEL_NAMES = ["Gran Hotel Central", "Boutique Plaza", "Hotel del Parque", "Residencia Norte", "Suites Mirador"];
-const APARTMENT_NAMES = ["Apartamento Centro", "Loft Mirador"];
+const APARTMENT_NAMES = ["Apartamento Centro", "Loft Mirador", "Casa Patio"];
 const pad = (n: number) => String(n).padStart(2, "0");
 
 export const mockProvider: TravelProvider = {
   async searchFlights({ from, to, date }) {
     const rand = seeded(`${from}-${to}-${date}`);
-    return Array.from({ length: 4 }, (_, i) => {
+    const offset = Math.floor(rand() * AIRLINES.length);
+    return Array.from({ length: 8 }, (_, i) => {
       const dep = 6 + Math.floor(rand() * 14);
       const dur = 1 + Math.floor(rand() * 6);
       return {
         id: `FL-${from}${to}-${i + 1}`,
-        airline: AIRLINES[Math.floor(rand() * AIRLINES.length)]!,
+        airline: AIRLINES[(offset + i) % AIRLINES.length]!,
         from: from.toUpperCase(),
         to: to.toUpperCase(),
         departure: `${date}T${pad(dep)}:${pad(Math.floor(rand() * 4) * 15)}`,
@@ -98,7 +99,7 @@ export const mockProvider: TravelProvider = {
       onlineCheckin: rand() > 0.35,
       digitalKey: rand() > 0.6,
     });
-    const hotels = HOTEL_NAMES.slice(0, 4).map((n, i) => make(n, i, "hotel")).filter((h) => h.stars >= minStars);
+    const hotels = HOTEL_NAMES.map((n, i) => make(n, i, "hotel")).filter((h) => h.stars >= minStars);
     const apartments = includeApartments ? APARTMENT_NAMES.map((n, i) => make(n, i, "apartment")) : [];
     const c = coordsFor(city);
     const withMedia = (h: HotelOption): HotelOption => ({

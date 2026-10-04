@@ -74,6 +74,10 @@ CREATE TABLE IF NOT EXISTS reminders (
   failed INTEGER NOT NULL DEFAULT 0,
   UNIQUE (proposal_id, kind)
 );
+CREATE TABLE IF NOT EXISTS trips (
+  user_id TEXT PRIMARY KEY,
+  data TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS wizard (
   user_id TEXT PRIMARY KEY,
   state TEXT NOT NULL

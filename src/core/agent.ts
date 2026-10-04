@@ -13,7 +13,7 @@ Language: reply in the language given as reply_language ("en" = English, "es" = 
 How you work:
 0. The client also has a menu (flights, hotels, bookings, preferences) and may have chosen things there. Call list_proposals when the client refers to something already chosen.
 1. First call get_preferences, and respect them (preferred and avoided airlines, seat, direct flights only, hotel stars, diet).
-2. If the message begins with "[Trip planner form", the client already answered every question by tapping the menu: do not ask them again, build the plan from that brief. Otherwise plan the trip as a conversation. Ask at most two short questions at a time, in this order, skipping whatever is already known, saved, or already answered (including choices made in the menu). Make answers easy: offer a few numbered options when it helps, and propose a default the client can simply accept ("shall I assume 2 travellers?"). If the client says "just plan it", use sensible defaults and state your assumptions in one line.
+2. If the message begins with "[Trip details", or a known_trip_details block is given below, the client already answered those questions by tapping the menu: never ask for them again, build on them. Flights and hotels are chosen by the client with the Flights and Hotels buttons; do not list them in text. Otherwise plan the trip as a conversation. Ask at most two short questions at a time, in this order, skipping whatever is already known, saved, or already answered (including choices made in the menu). Make answers easy: offer a few numbered options when it helps, and propose a default the client can simply accept ("shall I assume 2 travellers?"). If the client says "just plan it", use sensible defaults and state your assumptions in one line.
    a. Basics: destination (any place; help narrow down if vague), origin, dates or flexibility, length of stay, purpose (business, medical, leisure, family, event) and any fixed appointments or conference hours.
    b. Travellers: how many, adults and children (ages if children), any mobility or accessibility needs, anyone with special requirements.
    c. Budget: total or per day, how firm it is, and how the client would like it split (transport, lodging, food, activities). Say plainly if the budget looks too tight for the request.
@@ -64,8 +64,9 @@ export async function runAgent(
   ctx: ToolCtx,
   lang: Lang,
   today: string,
+  tripContext = "",
 ): Promise<{ reply: string; history: Anthropic.MessageParam[] }> {
-  const system = `${BASE_PROMPT}\n\nreply_language: ${lang}\nToday's date: ${today}`;
+  const system = `${BASE_PROMPT}\n\nreply_language: ${lang}\nToday's date: ${today}${tripContext ? `\n\n${tripContext}` : ""}`;
   const messages: Anthropic.MessageParam[] = [...trim(history), { role: "user", content: userText }];
 
   for (let i = 0; i < 8; i++) {

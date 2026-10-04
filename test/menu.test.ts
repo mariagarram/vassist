@@ -14,6 +14,8 @@ const lastChoice = (c: Ctx): Choice => {
 const optionIds = (m: Choice) => m.options.map((o) => o.id);
 /** Pulsa la opción cuyo id empieza por `prefix` (o la n-ésima de ese prefijo). */
 async function tap(c: Ctx, prefix: string, nth = 0) {
+  // «Vuelos y hoteles» ya no está en el menú (lo cubre el planificador), pero su flujo sigue vivo.
+  if (prefix === "m:new") return c.click("m:new");
   const ids = optionIds(lastChoice(c)).filter((id) => id.startsWith(prefix));
   assert.ok(ids[nth], `no hay opción ${prefix} en ${optionIds(lastChoice(c)).join(", ")}`);
   await c.click(ids[nth]!);
@@ -152,7 +154,7 @@ test("pasos caducados o de otro flujo no rompen nada: avisan y vuelven al menú"
   c.channel.clear();
   await c.click("o:0"); // sin flujo activo
   assert.match(textsOf(c)[0]!, /no longer active/);
-  assert.equal(optionIds(lastChoice(c))[0], "m:new");
+  assert.equal(optionIds(lastChoice(c))[0], "m:plan");
 
   c.channel.clear();
   await c.click("m:new");
@@ -213,7 +215,7 @@ test("Plan any trip abre el planificador: el destino va en un recuadro de texto 
   await c.text("A weekend in Ronda by train");
   assert.match(textsOf(c).at(-1)!, /depart from/);
   await c.text("Malaga");
-  assert.match(lastChoice(c).body, /purpose of the trip/);
+  assert.match(lastChoice(c).body, /When would you like to travel/);
 });
 
 test("Hablar con María avisa a María y no promete plazos", async () => {
@@ -270,7 +272,7 @@ test("'menu' vuelve al menú en cualquier momento y limpia el paso a medias", as
   await startFull(c);
   c.channel.clear();
   await c.text("menu");
-  assert.equal(optionIds(lastChoice(c))[0], "m:new");
+  assert.equal(optionIds(lastChoice(c))[0], "m:plan");
   assert.equal(c.store.getWizard(CLIENT), null);
 });
 

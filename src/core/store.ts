@@ -81,6 +81,14 @@ export class Store {
     }
     return out;
   }
+  /** Datos del viaje que se está planificando y respuestas que se recuerdan para el siguiente. */
+  getTrip<T>(userId: string): T | null {
+    const r = this.one("SELECT data FROM trips WHERE user_id = ?", userId);
+    return r ? (JSON.parse(String(r.data)) as T) : null;
+  }
+  setTrip(userId: string, data: unknown) {
+    this.run("INSERT INTO trips (user_id, data) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET data = excluded.data", userId, JSON.stringify(data));
+  }
   setPref(userId: string, key: string, value: unknown) {
     this.run(
       "INSERT INTO preferences (user_id, key, value) VALUES (?, ?, ?) ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value",

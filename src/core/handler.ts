@@ -89,6 +89,7 @@ export class Vassist {
       runText: (user, text) => this.runTurn(user, text),
       providers: d.providers ?? defaultProviders,
       approve: (user, id) => this.onReply(user, `ap:${id}`),
+      menu: (user) => this.menu.show(user),
     });
   }
 
@@ -223,7 +224,7 @@ export class Vassist {
     };
     try {
       const today = this.d.today?.() ?? new Date().toISOString().slice(0, 10);
-      const { reply, history } = await runAgent(this.d.llm, store.getHistory(user.id), text, ctx, user.lang, today);
+      const { reply, history } = await runAgent(this.d.llm, store.getHistory(user.id), text, ctx, user.lang, today, this.planner.tripContext(user.id));
       store.saveHistory(user.id, history);
       if (reply) for (const part of chunk(reply)) await channel.sendText(user.id, part);
       await this.flush(user, ctx.outbox);

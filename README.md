@@ -15,7 +15,7 @@ Asistente personal de viajes por WhatsApp, en español, inglés y árabe, solo p
 cp .env.example .env     # rellena ANTHROPIC_API_KEY (solo en este archivo, nunca en el chat)
 npm install
 npm run cli              # escribes como el cliente; un número pulsa un botón
-npm test                 # 58 pruebas con un modelo simulado (no gasta API)
+npm test                 # 70 pruebas con un modelo simulado (no gasta API)
 ```
 
 ## Probar por Telegram (más fácil que WhatsApp)
@@ -57,11 +57,17 @@ Al primer mensaje el bot pregunta el idioma con tres botones (**Español · Engl
 
 ## Planificador de viajes por botones (cualquier destino y medio)
 
-«Plan any trip» en el menú abre un formulario de 13 preguntas que el cliente contesta **pulsando opciones** (solo escribe destino, origen y los «otro»): destino, origen, motivo, cuándo, duración, viajeros, presupuesto, transporte (avión, tren, coche, coche con chófer, bus o ferry, «recomiéndame»), alojamiento, comida, intereses (hasta 3), ritmo y notas. «Saltar el resto» lleva al resumen desde la pregunta 4. Código en `src/core/planner.ts`; las preguntas y opciones están en el array `QS`, con textos EN/AR.
+«Plan any trip» es ahora la entrada principal. Solo hace **5 preguntas básicas** (destino y origen por escrito; cuándo, noches y viajeros por botones) y **recuerda lo ya dicho**: el siguiente viaje no vuelve a preguntar origen ni viajeros. Después muestra el **panel del viaje** con todo lo que se puede hacer:
 
-Con el resumen, «Create my plan» entrega el formulario completo a la IA (una sola llamada, sin preguntarlo todo otra vez). La IA redacta la ruta, el plan día a día con restaurantes y actividades, y un coste estimado frente al presupuesto. Después salen los botones **Crear propuestas** (la IA crea vuelo, hotel, transporte, actividad, restaurante con Aprobar/Rechazar) y **Ajustar el plan** (el cliente escribe qué cambiar). Solo vuelos y hoteles tienen buscador (datos de prueba); trenes, rutas en coche y actividades salen del conocimiento del modelo, se marcan como estimaciones y los verifica María antes de confirmar. Escribir texto libre en mitad del formulario lo abandona y lo atiende la IA.
+- **Vuelos:** todas las opciones que devuelve el proveedor (8 por página, «Más resultados»), con aerolínea, hora, escalas, precio y reembolsable. Ficha → **Reservar**. Tras reservar la ida aparece **Vuelo de vuelta**. Primero van tus aerolíneas preferidas y al final las que evitas.
+- **Hoteles y apartamentos:** igual, con foto y mapa en la ficha (más abajo).
+- **Plan completo con itinerario:** la IA redacta ruta, día a día con restaurantes y actividades y coste estimado, usando los datos ya dados (no vuelve a preguntarlos: se le pasan como `known_trip_details` en cada turno). Después: **Crear propuestas** (restaurantes, actividades, transporte, con Aprobar/Rechazar), **Ajustar el plan** o volver al panel.
+- **Mis preferencias de viaje:** 8 preguntas opcionales (motivo, presupuesto, transporte, alojamiento, comida, intereses, ritmo, notas) que se pueden saltar.
+- **Cambiar datos del viaje:** corrige solo un campo y vuelve al panel.
 
-**Hoteles y apartamentos con «Reservar».** Si el cliente no marcó «sin alojamiento», tras el plan aparece **Hoteles y apartamentos**: lista de hasta 6 opciones (destino, fecha y noches del formulario; a 2 semanas vista si no dio fecha). Al tocar una, tarjeta visual: **pin de mapa** y **foto** con precio, cancelación, check-in online y los botones **Reservar** / **Volver a la lista**. Con datos de prueba la foto es genérica y el pin aproximado, y la tarjeta lo dice («Sample data»). Con un proveedor real vendrían del proveedor (o de Google Places).
+Las fechas y noches escritas a mano se validan y se vuelven a pedir si no se entienden. El flujo antiguo «Vuelos y hoteles» ya no sale en el menú (lo cubre el panel), aunque su código sigue. Escribir texto libre en mitad de las preguntas las abandona y lo atiende la IA. **La cobertura depende del proveedor:** con los datos de prueba hay 8 vuelos y 8 alojamientos inventados; con un proveedor real saldrá lo que él venda, no todo el mercado (ni Airbnb, que no tiene API pública).
+
+**Hoteles y apartamentos con «Reservar».** Lista paginada con el destino, la fecha y las noches del panel. Al tocar una, tarjeta visual: **pin de mapa** y **foto** con precio, cancelación, check-in online y los botones **Reservar** / **Volver a la lista**. Con datos de prueba la foto es genérica y el pin aproximado, y la tarjeta lo dice («Sample data»). Con un proveedor real vendrían del proveedor (o de Google Places).
 
 **Quién gestiona qué (`autoBook`, activado en `telegram.ts` y `server.ts`)**
 - **Vuelos y hoteles/apartamentos:** al aprobar, el bot reserva con el proveedor (`TravelProvider.book`) y confirma al cliente al momento, con referencia y recordatorios. María no interviene. El proveedor de pruebas **simula** la reserva y el mensaje lo declara («TEST MODE»). Si falla, el cliente lo sabe y María recibe un aviso `FALLO` con `/confirm ID` o `/decline ID` por si lo resuelve ella.

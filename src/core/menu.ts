@@ -81,7 +81,6 @@ export class Menu {
     this.h.store.clearWizard(user.id);
     const m = this.t(user.lang);
     await this.h.channel.sendList(user.id, m.main, m.mainLabel, [
-      { id: "m:new", title: m.rowNew },
       { id: "m:plan", title: m.rowPlan },
       { id: "m:book", title: m.rowBookings },
       { id: "m:prefs", title: m.rowPrefs },
