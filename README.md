@@ -51,9 +51,11 @@ Los pasos de Meta cambian de pantalla con frecuencia; verifica cada uno en la do
 8. Crea además dos plantillas **Utility** (una en inglés y otra en árabe, una variable en el cuerpo) y ponlas en `REMINDER_TEMPLATE_EN` y `REMINDER_TEMPLATE_AR`. Sin ellas, los recordatorios solo llegan si el cliente ha escrito al bot en las últimas 24 h.
 9. `npm start`.
 
-## Planificador de viajes (cualquier destino y medio)
+## Planificador de viajes por botones (cualquier destino y medio)
 
-«Plan any trip» en el menú, o escribir libremente, abre una conversación con la IA que lo pregunta todo por orden: lo básico (destino, fechas, motivo), viajeros, presupuesto, cómo llegar (avión, tren, coche, bus, ferry), alojamiento, comida, intereses y ritmo, y logística. Después resume el plan día a día con un coste estimado frente al presupuesto y, si el cliente confirma, crea las propuestas (vuelo, hotel, transporte, actividad, restaurante). Solo vuelos y hoteles tienen buscador (datos de prueba); trenes, rutas en coche y actividades salen del conocimiento del modelo, se marcan como estimaciones y los verifica María antes de confirmar. Un destino que el menú de vuelos no reconoce (un pueblo, un país) pasa solo a la IA.
+«Plan any trip» en el menú abre un formulario de 13 preguntas que el cliente contesta **pulsando opciones** (solo escribe destino, origen y los «otro»): destino, origen, motivo, cuándo, duración, viajeros, presupuesto, transporte (avión, tren, coche, coche con chófer, bus o ferry, «recomiéndame»), alojamiento, comida, intereses (hasta 3), ritmo y notas. «Saltar el resto» lleva al resumen desde la pregunta 4. Código en `src/core/planner.ts`; las preguntas y opciones están en el array `QS`, con textos EN/AR.
+
+Con el resumen, «Create my plan» entrega el formulario completo a la IA (una sola llamada, sin preguntarlo todo otra vez). La IA redacta la ruta, el plan día a día con restaurantes y actividades, y un coste estimado frente al presupuesto. Después salen los botones **Crear propuestas** (la IA crea vuelo, hotel, transporte, actividad, restaurante con Aprobar/Rechazar) y **Ajustar el plan** (el cliente escribe qué cambiar). Solo vuelos y hoteles tienen buscador (datos de prueba); trenes, rutas en coche y actividades salen del conocimiento del modelo, se marcan como estimaciones y los verifica María antes de confirmar. Escribir texto libre en mitad del formulario lo abandona y lo atiende la IA.
 
 ## El menú (forma principal de uso)
 

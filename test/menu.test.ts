@@ -205,15 +205,15 @@ test("otro destino escrito: ciudad conocida, código y desconocida", async () =>
   assert.match(lastChoice(c).body, /Flights from RUH to GVA/);
 });
 
-test("Plan any trip: el menú pide el viaje en una frase y lo sigue la IA", async () => {
+test("Plan any trip abre el planificador por botones; un texto libre lo deja en manos de la IA", async () => {
   const c = setup();
   await c.text("hello");
   await tap(c, "m:plan");
-  assert.match(textsOf(c).at(-1)!, /any city, town or country/);
-  assert.equal(c.store.getWizard(CLIENT), null);
+  assert.match(lastChoice(c).body, /Where would you like to go/);
   c.llm.queue(say("Of course. What is your approximate budget, and who is travelling?"));
   await c.text("A weekend in Ronda by train");
   assert.match(textsOf(c).at(-1)!, /approximate budget/);
+  assert.equal(c.store.getWizard(CLIENT), null);
 });
 
 test("Hablar con María avisa a María y no promete plazos", async () => {

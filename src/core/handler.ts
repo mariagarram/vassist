@@ -3,6 +3,7 @@ import { T, detectLang } from "./i18n";
 import { applySuggestion, deriveSuggestions } from "./insights";
 import { providers as defaultProviders, type TravelProvider } from "./providers";
 import { Menu } from "./menu";
+import { Planner } from "./planner";
 import { scheduleReminders } from "./reminders";
 import type { Store, User } from "./store";
 import type { OutboxItem, ToolCtx } from "./tools";
@@ -57,6 +58,7 @@ const isTrivial = (t: string) => t.trim().length <= 25 || /^\/?start$/i.test(t.t
 export class Vassist {
   private queues = new Map<string, Promise<void>>();
   private menu: Menu;
+  private planner: Planner;
 
   constructor(private d: Deps) {
     this.menu = new Menu({
@@ -68,6 +70,16 @@ export class Vassist {
       sendApproval: (user, id) => this.sendApproval(user, id),
       askRating: (user, planId) => this.maybeAskRating(user, planId),
       alertOwner: (severity, text) => this.alert(severity, text),
+    });
+    this.planner = new Planner({
+      store: d.store,
+      channel: d.channel,
+      now: () => this.now(),
+      runBrief: async (user, brief) => {
+        await this.runTurn(user, brief);
+        await this.planner.afterPlan(user);
+      },
+      runText: (user, text) => this.runTurn(user, text),
     });
   }
 
@@ -170,7 +182,7 @@ export class Vassist {
       if (wantsMenu || isTrivial(msg.text)) return this.menu.show(current);
     } else if (wantsMenu) {
       return this.menu.show(current);
-    } else if (await this.menu.onText(current, msg.text)) {
+    } else if ((await this.planner.onText(current, msg.text)) || (await this.menu.onText(current, msg.text))) {
       return;
     }
     // Texto libre: lo atiende la IA y se abandona cualquier paso del menú a medias.
@@ -311,6 +323,8 @@ export class Vassist {
       }
 
       default:
+        if (replyId === "m:plan") return this.planner.start(user);
+        if (await this.planner.onReply(user, replyId)) return;
         if (await this.menu.onReply(user, replyId)) return;
         console.warn("[vassist] respuesta de botón desconocida:", replyId);
     }

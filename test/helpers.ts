@@ -45,12 +45,14 @@ export class ScriptedLlm implements Llm {
   script: Anthropic.Message[] = [];
   systems: string[] = [];
   calls = 0;
+  requests: { messages: unknown[] }[] = [];
   queue(...m: Anthropic.Message[]) {
     this.script.push(...m);
   }
-  async create(p: { system: string }) {
+  async create(p: { system: string; messages?: unknown[] }) {
     this.calls++;
     this.systems.push(p.system);
+    this.requests.push({ messages: JSON.parse(JSON.stringify(p.messages ?? [])) });
     const next = this.script.shift();
     if (!next) throw new Error("ScriptedLlm: no quedan respuestas en el guion");
     return next;
