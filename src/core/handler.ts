@@ -80,6 +80,8 @@ export class Vassist {
         await this.planner.afterPlan(user);
       },
       runText: (user, text) => this.runTurn(user, text),
+      providers: d.providers ?? defaultProviders,
+      approve: (user, id) => this.onReply(user, `ap:${id}`),
     });
   }
 

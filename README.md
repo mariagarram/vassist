@@ -15,7 +15,7 @@ Asistente personal de viajes por WhatsApp, en inglés y árabe, solo por escrito
 cp .env.example .env     # rellena ANTHROPIC_API_KEY (solo en este archivo, nunca en el chat)
 npm install
 npm run cli              # escribes como el cliente; un número pulsa un botón
-npm test                 # 43 pruebas con un modelo simulado (no gasta API)
+npm test                 # 54 pruebas con un modelo simulado (no gasta API)
 ```
 
 ## Probar por Telegram (más fácil que WhatsApp)
@@ -56,6 +56,8 @@ Los pasos de Meta cambian de pantalla con frecuencia; verifica cada uno en la do
 «Plan any trip» en el menú abre un formulario de 13 preguntas que el cliente contesta **pulsando opciones** (solo escribe destino, origen y los «otro»): destino, origen, motivo, cuándo, duración, viajeros, presupuesto, transporte (avión, tren, coche, coche con chófer, bus o ferry, «recomiéndame»), alojamiento, comida, intereses (hasta 3), ritmo y notas. «Saltar el resto» lleva al resumen desde la pregunta 4. Código en `src/core/planner.ts`; las preguntas y opciones están en el array `QS`, con textos EN/AR.
 
 Con el resumen, «Create my plan» entrega el formulario completo a la IA (una sola llamada, sin preguntarlo todo otra vez). La IA redacta la ruta, el plan día a día con restaurantes y actividades, y un coste estimado frente al presupuesto. Después salen los botones **Crear propuestas** (la IA crea vuelo, hotel, transporte, actividad, restaurante con Aprobar/Rechazar) y **Ajustar el plan** (el cliente escribe qué cambiar). Solo vuelos y hoteles tienen buscador (datos de prueba); trenes, rutas en coche y actividades salen del conocimiento del modelo, se marcan como estimaciones y los verifica María antes de confirmar. Escribir texto libre en mitad del formulario lo abandona y lo atiende la IA.
+
+**Hoteles y apartamentos con «Reservar».** Si el cliente no marcó «sin alojamiento», tras el plan aparece **Hoteles y apartamentos**: lista de hasta 6 opciones (destino, fecha y noches del formulario; fecha a 2 semanas si dijo «flexible»), ficha con precio, cancelación y check-in online, y un botón **Reservar**. Reservar crea la propuesta ya aprobada y te avisa con `/confirm ID`: **la reserva real la haces tú con el proveedor** y el cliente recibe la confirmación y los recordatorios al confirmar. Los datos son de prueba hasta conectar un proveedor real; con uno, `searchHotels` puede devolver apartamentos (`type: "apartment"`) y aquí se podría automatizar la reserva y el pago (pendiente).
 
 ## El menú (forma principal de uso)
 

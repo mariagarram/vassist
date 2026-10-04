@@ -19,6 +19,8 @@ export type HotelOption = {
   id: string;
   name: string;
   city: string;
+  /** hotel o apartamento turístico. */
+  type: "hotel" | "apartment";
   stars: number;
   pricePerNightEur: number;
   freeCancellation: boolean;
@@ -31,7 +33,7 @@ export type HotelOption = {
 
 export interface TravelProvider {
   searchFlights(p: { from: string; to: string; date: string; returnDate?: string }): Promise<FlightOption[]>;
-  searchHotels(p: { city: string; checkIn: string; checkOut: string; minStars?: number; onlineCheckinOnly?: boolean }): Promise<HotelOption[]>;
+  searchHotels(p: { city: string; checkIn: string; checkOut: string; minStars?: number; onlineCheckinOnly?: boolean; includeApartments?: boolean }): Promise<HotelOption[]>;
 }
 
 function seeded(seed: string) {
@@ -46,6 +48,7 @@ function seeded(seed: string) {
 
 const AIRLINES = ["Iberia", "Saudia", "Lufthansa", "Air France", "KLM", "British Airways", "Emirates"];
 const HOTEL_NAMES = ["Gran Hotel Central", "Boutique Plaza", "Hotel del Parque", "Residencia Norte", "Suites Mirador"];
+const APARTMENT_NAMES = ["Apartamento Centro", "Loft Mirador"];
 const pad = (n: number) => String(n).padStart(2, "0");
 
 export const mockProvider: TravelProvider = {
@@ -68,21 +71,24 @@ export const mockProvider: TravelProvider = {
     }).sort((a, b) => a.priceEur - b.priceEur);
   },
 
-  async searchHotels({ city, checkIn, minStars = 3, onlineCheckinOnly = false }) {
+  async searchHotels({ city, checkIn, minStars = 3, onlineCheckinOnly = false, includeApartments = false }) {
     const rand = seeded(`${city}-${checkIn}`);
-    return HOTEL_NAMES.slice(0, 4)
-      .map((name, i) => ({
-        id: `HT-${city.slice(0, 3).toUpperCase()}-${i + 1}`,
-        name: `${name} ${city}`,
-        city,
-        stars: 3 + Math.floor(rand() * 3),
-        pricePerNightEur: Math.round(70 + rand() * 280),
-        freeCancellation: rand() > 0.4,
-        distanceToCenterKm: Math.round(rand() * 80) / 10,
-        onlineCheckin: rand() > 0.35,
-        digitalKey: rand() > 0.6,
-      }))
-      .filter((h) => h.stars >= minStars && (!onlineCheckinOnly || h.onlineCheckin))
+    const make = (name: string, i: number, type: "hotel" | "apartment"): HotelOption => ({
+      id: `${type === "hotel" ? "HT" : "AP"}-${city.slice(0, 3).toUpperCase()}-${i + 1}`,
+      name: `${name} ${city}`,
+      city,
+      type,
+      stars: 3 + Math.floor(rand() * 3),
+      pricePerNightEur: Math.round(70 + rand() * 280),
+      freeCancellation: rand() > 0.4,
+      distanceToCenterKm: Math.round(rand() * 80) / 10,
+      onlineCheckin: rand() > 0.35,
+      digitalKey: rand() > 0.6,
+    });
+    const hotels = HOTEL_NAMES.slice(0, 4).map((n, i) => make(n, i, "hotel")).filter((h) => h.stars >= minStars);
+    const apartments = includeApartments ? APARTMENT_NAMES.map((n, i) => make(n, i, "apartment")) : [];
+    return [...hotels, ...apartments]
+      .filter((h) => !onlineCheckinOnly || h.onlineCheckin)
       .sort((a, b) => a.pricePerNightEur - b.pricePerNightEur);
   },
 };

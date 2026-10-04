@@ -1,4 +1,5 @@
 import { parseDate } from "./menu";
+import { iataFor, offsetFor, type HotelOption, type TravelProvider } from "./providers";
 import type { Store, User } from "./store";
 import type { Channel, Lang, Row } from "./types";
 
@@ -16,11 +17,15 @@ export interface PlannerHost {
   runBrief(user: User, brief: string): Promise<void>;
   /** Mensaje del cliente a la IA, tal cual. */
   runText(user: User, text: string): Promise<void>;
+  providers: TravelProvider;
+  /** Aprueba la propuesta como si el cliente hubiera pulsado «Aprobar»: avisa a María, que reserva y confirma. */
+  approve(user: User, proposalId: string): Promise<void>;
 }
 
 type L2 = { en: string; ar: string };
 type Opt = { v: string } & L2;
-type Ctx = { user: User; prefs: Record<string, unknown>; recent: string[] };
+type Ctx = { user: User; prefs: Record<string, unknown>; recent: string[]; today: string };
+const addDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 type Q = {
   key: string;
   /** Etiqueta del campo en el resumen. */
@@ -65,26 +70,27 @@ const QS: Q[] = [
     key: "when",
     name: { en: "When", ar: "الموعد" },
     ask: { en: "When would you like to travel?", ar: "متى تودون السفر؟" },
-    opts: () => [
-      o("this week", "This week", "هذا الأسبوع"),
-      o("next week", "Next week", "الأسبوع القادم"),
-      o("within a month", "Within a month", "خلال شهر"),
-      o("in 2 to 3 months", "In 2 to 3 months", "خلال شهرين إلى ثلاثة"),
-      o("flexible dates", "Flexible", "مواعيد مرنة"),
+    opts: (c) => [
+      o(addDays(c.today, 3), "In 3 days", "بعد 3 أيام"),
+      o(addDays(c.today, 7), "In 1 week", "بعد أسبوع"),
+      o(addDays(c.today, 14), "In 2 weeks", "بعد أسبوعين"),
+      o(addDays(c.today, 30), "In 1 month", "بعد شهر"),
+      o(addDays(c.today, 75), "In 2 to 3 months", "بعد شهرين إلى ثلاثة"),
     ],
     other: { label: { en: "Exact date", ar: "تاريخ محدد" }, ask: { en: "Please write the departure date, for example 2026-11-12.", ar: "اكتبوا تاريخ المغادرة، مثل 2026-11-12." }, placeholder: { en: "2026-11-12", ar: "2026-11-12" } },
   },
   {
     key: "length",
-    name: { en: "Length of stay", ar: "مدة الإقامة" },
-    ask: { en: "How long will you stay?", ar: "كم ستدوم الرحلة؟" },
+    name: { en: "Nights", ar: "عدد الليالي" },
+    ask: { en: "How many nights will you stay?", ar: "كم ليلة ستقيمون؟" },
     opts: () => [
-      o("1 to 2 days", "1 to 2 days", "يوم إلى يومين"),
-      o("3 to 4 days", "3 to 4 days", "3 إلى 4 أيام"),
-      o("5 to 7 days", "5 to 7 days", "5 إلى 7 أيام"),
-      o("8 to 14 days", "8 to 14 days", "8 إلى 14 يوماً"),
-      o("more than 2 weeks", "More than 2 weeks", "أكثر من أسبوعين"),
+      o("2", "2 nights", "ليلتان"),
+      o("4", "4 nights", "4 ليال"),
+      o("7", "1 week", "أسبوع"),
+      o("10", "10 nights", "10 ليال"),
+      o("14", "2 weeks", "أسبوعان"),
     ],
+    other: { label: { en: "Other number", ar: "عدد آخر" }, ask: { en: "Please write the number of nights, for example 5.", ar: "اكتبوا عدد الليالي، مثل 5." }, placeholder: { en: "Number of nights", ar: "عدد الليالي" } },
   },
   {
     key: "travellers",
@@ -132,7 +138,8 @@ const QS: Q[] = [
       o("3-star hotel", "Hotel 3 stars", "فندق 3 نجوم"),
       o("4-star hotel", "Hotel 4 stars", "فندق 4 نجوم"),
       o("5-star hotel", "Hotel 5 stars", "فندق 5 نجوم"),
-      o("boutique hotel or apartment", "Boutique or apartment", "فندق بوتيك أو شقة"),
+      o("boutique hotel", "Boutique hotel", "فندق بوتيك"),
+      o("apartment", "Apartment", "شقة"),
       o("no accommodation needed", "Not needed", "لا حاجة للإقامة"),
     ],
   },
@@ -198,6 +205,22 @@ const TX = {
     makeText: "Yes, please create the proposals for this plan.",
     notSet: "Not specified",
     cancelled: "Planner cancelled. Write \"menu\" whenever you need me.",
+    stays: "Hotels and apartments",
+    back: "Back to the list",
+    book: "Book",
+    staysHead: (city: string, n: number, from: string) => `Stays in ${city}, ${n} night${n === 1 ? "" : "s"} from ${from}. Tap one to see it:`,
+    staysNone: "I found no stays for those dates. You can adjust the plan and try again.",
+    staysGone: "Those results are no longer available. Please press Hotels and apartments again.",
+    hotel: "Hotel",
+    apartment: "Apartment",
+    perNight: "per night",
+    freeCancel: "free cancellation",
+    onlineCheckin: "online check-in",
+    digitalKey: "digital key",
+    km: "km from the centre",
+    total: (n: number, eur: number) => `${n} night${n === 1 ? "" : "s"}: EUR ${eur}`,
+    booked: "Your booking request is sent. Maria completes the booking with the provider and confirms it here. Nothing is charged by this assistant.",
+    sample: "Prices and availability are sample data until a live provider is connected.",
   },
   ar: {
     start: "لنخطط لرحلتكم. سأطرح بضعة أسئلة، وما عليكم سوى الضغط على إجاباتكم.",
@@ -218,18 +241,40 @@ const TX = {
     makeText: "نعم، من فضلك أنشئ المقترحات لهذه الخطة.",
     notSet: "غير محدد",
     cancelled: "تم إلغاء المخطط. اكتبوا \"القائمة\" متى احتجتم إليّ.",
+    stays: "فنادق وشقق",
+    back: "العودة إلى القائمة",
+    book: "احجز",
+    staysHead: (city: string, n: number, from: string) => `أماكن الإقامة في ${city}، ${n} ليلة ابتداءً من ${from}. اضغطوا على أحدها لعرضه:`,
+    staysNone: "لم أجد إقامة في هذه التواريخ. يمكنكم تعديل الخطة والمحاولة مجدداً.",
+    staysGone: "هذه النتائج لم تعد متاحة. اضغطوا على فنادق وشقق مرة أخرى من فضلكم.",
+    hotel: "فندق",
+    apartment: "شقة",
+    perNight: "لليلة",
+    freeCancel: "إلغاء مجاني",
+    onlineCheckin: "تسجيل وصول عبر الإنترنت",
+    digitalKey: "مفتاح رقمي",
+    km: "كم عن المركز",
+    total: (n: number, eur: number) => `${n} ليلة: ${eur} يورو`,
+    booked: "تم إرسال طلب الحجز. ستُتم ماريا الحجز لدى المزوّد وتؤكده هنا. لا يخصم هذا المساعد أي مبلغ.",
+    sample: "الأسعار والتوافر بيانات تجريبية إلى أن يُربط مزوّد حقيقي.",
   },
-} satisfies Record<Lang, Record<string, string>>;
+};
 
 type State = { planner: true; i: number; a: Record<string, string>; sel: string[]; awaiting?: boolean };
 
 const clip = (s: string, n: number) => (s.length <= n ? s : `${s.slice(0, n - 1)}…`);
 
+type Stay = HotelOption & { checkIn: string; checkOut: string; nights: number };
+type StayCtx = { city: string; checkIn: string; nights: number; hotelsOnly: boolean; apartmentsFirst: boolean; minStars: number; shown: Stay[] };
+
 export class Planner {
+  /** Lo último que se mostró de hoteles y apartamentos, por cliente. Solo en memoria: si se reinicia, el botón pide repetir. */
+  private stays = new Map<string, StayCtx>();
+
   constructor(private h: PlannerHost) {}
 
   private ctx(user: User): Ctx {
-    return { user, prefs: this.h.store.getPrefs(user.id), recent: this.h.store.recentCities(user.id) };
+    return { user, prefs: this.h.store.getPrefs(user.id), recent: this.h.store.recentCities(user.id), today: this.today() };
   }
   private today() {
     return this.h.now().toISOString().slice(0, 10);
@@ -278,7 +323,7 @@ export class Planner {
 
   private label(q: Q, value: string, lang: Lang): string {
     // El resumen enseña la opción en el idioma del cliente cuando es una de las predefinidas.
-    const found = q.opts({ user: { lang } as User, prefs: {}, recent: [] }).find((x) => x.v === value);
+    const found = q.opts({ user: { lang } as User, prefs: {}, recent: [], today: this.today() }).find((x) => x.v === value);
     return found ? found[lang] : value;
   }
 
@@ -305,6 +350,10 @@ export class Planner {
     if (!q) return false;
     let value = clip(text.trim(), 200);
     if (q.key === "when") value = parseDate(value, this.today()) ?? value;
+    if (q.key === "length") {
+      const n = Number.parseInt(value, 10);
+      if (Number.isInteger(n) && n >= 1 && n <= 60) value = String(n);
+    }
     await this.record(user, w, q, value);
     return true;
   }
@@ -347,6 +396,9 @@ export class Planner {
       await channel.sendText(user.id, tx.cancelled);
       return true;
     }
+    if (arg === "st" || arg === "bl") return this.showStays(user);
+    if (arg === "b") return this.showStay(user, Number(parts[2]));
+    if (arg === "bk") return this.bookStay(user, Number(parts[2]));
     if (arg === "redo") {
       await this.start(user);
       return true;
@@ -356,6 +408,7 @@ export class Planner {
     if (arg === "go") {
       if (!w) return this.stale(user);
       store.clearWizard(user.id);
+      this.rememberStays(user, w);
       await channel.sendText(user.id, tx.working);
       await this.h.runBrief(user, this.brief(w, user.lang));
       return true;
@@ -395,6 +448,129 @@ export class Planner {
     return true;
   }
 
+  private rememberStays(user: User, w: State) {
+    const a = w.a;
+    const lodging = a.lodging ?? "";
+    const city = (a.destination ?? "").trim();
+    const nights = Number.parseInt(a.length ?? "", 10);
+    if (!city || !lodging || lodging.includes("no accommodation") || !Number.isInteger(nights) || nights < 1) {
+      this.stays.delete(user.id);
+      return;
+    }
+    // Sin fecha concreta, se ofrece a dos semanas vista y la lista lo dice con la fecha.
+    const checkIn = /^\d{4}-\d{2}-\d{2}$/.test(a.when ?? "") ? a.when! : addDays(this.today(), 14);
+    const stars = /(\d)-star/.exec(lodging);
+    this.stays.set(user.id, {
+      city,
+      checkIn,
+      nights,
+      hotelsOnly: false,
+      apartmentsFirst: lodging === "apartment",
+      minStars: stars ? Number(stars[1]) : 3,
+      shown: [],
+    });
+  }
+
+  /** Lista de hoteles y apartamentos reservables con un toque. */
+  private async showStays(user: User) {
+    const tx = TX[user.lang];
+    const ctx = this.stays.get(user.id);
+    if (!ctx) {
+      await this.h.channel.sendText(user.id, tx.staysGone);
+      return true;
+    }
+    const prefs = this.h.store.getPrefs(user.id);
+    const checkOut = addDays(ctx.checkIn, ctx.nights);
+    const found = await this.h.providers.searchHotels({
+      city: ctx.city,
+      checkIn: ctx.checkIn,
+      checkOut,
+      minStars: ctx.minStars,
+      onlineCheckinOnly: prefs.require_online_checkin === true,
+      includeApartments: true,
+    });
+    const list = [...found].sort(
+      (a, b) =>
+        Number(ctx.apartmentsFirst ? b.type === "apartment" : false) - Number(ctx.apartmentsFirst ? a.type === "apartment" : false) ||
+        a.pricePerNightEur - b.pricePerNightEur,
+    );
+    ctx.shown = list.slice(0, 6).map((h) => ({ ...h, checkIn: ctx.checkIn, checkOut, nights: ctx.nights }));
+    if (!ctx.shown.length) {
+      await this.h.channel.sendText(user.id, tx.staysNone);
+      return true;
+    }
+    await this.h.channel.sendList(
+      user.id,
+      `${tx.staysHead(ctx.city, ctx.nights, ctx.checkIn)}\n${tx.sample}`,
+      tx.pick,
+      ctx.shown.map((h, i) => ({
+        id: `p:b:${i}`,
+        title: clip(h.name, 24),
+        description: `EUR ${h.pricePerNightEur} ${tx.perNight} · ${h.type === "apartment" ? tx.apartment : `${h.stars}★`}`,
+      })),
+    );
+    return true;
+  }
+
+  private async showStay(user: User, idx: number) {
+    const tx = TX[user.lang];
+    const h = this.stays.get(user.id)?.shown[idx];
+    if (!h) return this.staleStays(user);
+    const total = h.pricePerNightEur * h.nights;
+    const extras = [h.freeCancellation ? tx.freeCancel : "", h.onlineCheckin ? tx.onlineCheckin : "", h.digitalKey ? tx.digitalKey : ""].filter(Boolean).join(" · ");
+    const body = [
+      `${h.name} (${h.type === "apartment" ? tx.apartment : `${tx.hotel} ${h.stars}★`})`,
+      `${h.checkIn} → ${h.checkOut}`,
+      `EUR ${h.pricePerNightEur} ${tx.perNight} · ${tx.total(h.nights, total)}`,
+      `${h.distanceToCenterKm} ${tx.km}`,
+      extras,
+      tx.sample,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    await this.h.channel.sendButtons(user.id, body, [
+      { id: `p:bk:${idx}`, title: tx.book },
+      { id: "p:bl", title: tx.back },
+    ]);
+    return true;
+  }
+
+  /** «Reservar»: crea la propuesta y la aprueba. El aviso a María con /confirm lo envía el flujo de aprobación. */
+  private async bookStay(user: User, idx: number) {
+    const tx = TX[user.lang];
+    const { store } = this.h;
+    const h = this.stays.get(user.id)?.shown[idx];
+    if (!h) return this.staleStays(user);
+    const offset = offsetFor(iataFor(h.city) ?? "");
+    const plan = store.openPlan(user.id) ?? store.createPlan(user.id, `${h.city} ${h.checkIn}`);
+    const proposal = store.createProposal({
+      planId: plan.id,
+      userId: user.id,
+      kind: "hotel",
+      title: h.name,
+      details: `${h.type === "apartment" ? "Apartment" : `Hotel ${h.stars}*`}, ${h.nights} night(s), ${h.checkIn} to ${h.checkOut}`,
+      amountEur: h.pricePerNightEur * h.nights,
+      attrs: {
+        stars: h.stars,
+        city: h.city,
+        online_checkin: h.onlineCheckin,
+        digital_key: h.digitalKey,
+        starts_at: `${h.checkIn}T15:00:00${offset}`,
+        ends_at: `${h.checkOut}T11:00:00${offset}`,
+      },
+    });
+    // Un segundo toque sobre «Reservar» no debe crear otra reserva.
+    this.stays.get(user.id)!.shown[idx] = undefined as unknown as Stay;
+    await this.h.channel.sendText(user.id, tx.booked);
+    await this.h.approve(user, proposal.id);
+    return true;
+  }
+
+  private async staleStays(user: User) {
+    await this.h.channel.sendText(user.id, TX[user.lang].staysGone);
+    return true;
+  }
+
   /** Formulario completo para la IA, en inglés (la IA responde en el idioma del cliente). */
   private brief(w: State, lang: Lang): string {
     const lines = QS.map((q) => `- ${q.name.en}: ${w.a[q.key] || "not specified"}`);
@@ -402,7 +578,7 @@ export class Planner {
       `[Trip planner form completed by the client with the menu. Reply language: ${lang}. Today is ${this.today()}. Do not ask these questions again.]`,
       ...lines,
       "",
-      "Please write the plan now: route and mode, a short day-by-day outline (morning, afternoon, evening) with restaurant and activity suggestions that fit the interests, pace and food needs, and an estimated cost breakdown against the budget level (mark every figure as an estimate). Use the search tools for flights and hotels when they apply and an origin and date are clear. Ask a question only if something essential is missing. Keep it concise for a phone. Do not create proposals yet: the client will tap a button to confirm.",
+      "Please write the plan now: route and mode, a short day-by-day outline (morning, afternoon, evening) with restaurant and activity suggestions that fit the interests, pace and food needs, and an estimated cost breakdown against the budget level (mark every figure as an estimate). Use the search tool for flights when it applies and an origin and date are clear. Do not list specific hotels or apartments or prices for them: the menu offers real bookable stays right after the plan, so only recommend the best area to stay. Ask a question only if something essential is missing. Keep it concise for a phone. Do not create proposals yet: the client will tap a button to confirm.",
     ].join("\n");
   }
 
@@ -410,6 +586,7 @@ export class Planner {
   async afterPlan(user: User) {
     const tx = TX[user.lang];
     await this.h.channel.sendButtons(user.id, tx.afterPlan, [
+      ...(this.stays.has(user.id) ? [{ id: "p:st", title: tx.stays }] : []),
       { id: "p:make", title: tx.make },
       { id: "p:adj", title: tx.adjust },
     ]);

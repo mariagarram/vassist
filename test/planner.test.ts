@@ -52,7 +52,7 @@ test("planificador: todo por botones, resumen, plan de la IA y botones de crear/
   assert.match(JSON.stringify(sent.messages.at(-1)), /Trip planner form/);
   assert.match(JSON.stringify(sent.messages.at(-1)), /Destination: Vejer de la Frontera/);
   assert.match(texts(c).at(-1)!, /Estimated total/);
-  assert.deepEqual(ids(c), ["p:make", "p:adj"]);
+  assert.deepEqual(ids(c), ["p:st", "p:make", "p:adj"]);
   assert.equal(c.store.getWizard(CLIENT), null);
 
   // «Crear propuestas» se lo pasa a la IA, que crea la propuesta
@@ -94,4 +94,40 @@ test("planificador en árabe: sale en árabe y los botones viejos no rompen nada
   assert.match(texts(c).at(-1)!, /اكتبوا اسم المكان/);
   await c.click("p:7:1"); // botón de otra pregunta: obsoleto
   assert.ok(texts(c).some((x) => /لم يعد متاحاً/.test(x)));
+});
+
+test("planificador: ofrece hoteles y apartamentos y «Reservar» crea la propuesta aprobada y avisa a María", async () => {
+  const c = setup();
+  await c.text("hello");
+  await tap(c, "m:plan");
+  await c.text("Vejer de la Frontera");
+  await c.text("Malaga");
+  for (let q = 2; q < 12; q++) {
+    if (q === 10) {
+      await pick(c, 1);
+      await tap(c, "p:10:d");
+    } else await pick(c, q === 8 ? 3 : 0); // alojamiento: «Hotel boutique» no; la 4.ª opción es «Apartamento»
+  }
+  await pick(c, 0);
+  c.llm.queue(say("Plan text."));
+  await tap(c, "p:go");
+  await tap(c, "p:st");
+  const list = last(c);
+  assert.equal(list.kind, "list");
+  assert.ok(list.options.some((o) => /Apartamento|Loft/.test(o.title)), "debe incluir apartamentos");
+  assert.match(JSON.stringify(list.options), /EUR \d+ per night/);
+  assert.ok(list.options[0]!.id.startsWith("p:b:"));
+  await c.click(list.options[0]!.id);
+  assert.deepEqual(ids(c), ["p:bk:0", "p:bl"]);
+  assert.match(last(c).body, /free cancellation|EUR/);
+  await c.click("p:bk:0");
+  const [proposal] = c.store.listProposals(CLIENT);
+  assert.equal(proposal!.kind, "hotel");
+  assert.equal(proposal!.status, "approved");
+  assert.ok(String(proposal!.attrs.starts_at).includes("T15:00:00"));
+  assert.ok(texts(c).some((x) => /booking request is sent/.test(x)));
+  assert.match(c.alerts.at(-1)!.text, new RegExp(`/confirm ${proposal!.id}`));
+  // un segundo toque no duplica la reserva
+  await c.click("p:bk:0");
+  assert.equal(c.store.listProposals(CLIENT).length, 1);
 });
