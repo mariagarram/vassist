@@ -36,8 +36,8 @@ const notifyOwner = owner
   : async (a: { text: string }) => console.warn("[vassist] OWNER_PHONE sin configurar. Aviso:", a.text);
 
 // Plantillas de utilidad aprobadas en Meta para escribir al cliente fuera de las 24 h (una por idioma, 1 variable en el cuerpo).
-const clientTemplates = { en: process.env.REMINDER_TEMPLATE_EN, ar: process.env.REMINDER_TEMPLATE_AR };
-const sendOutside = async (to: string, text: string, lang: "en" | "ar") => {
+const clientTemplates = { en: process.env.REMINDER_TEMPLATE_EN, es: process.env.REMINDER_TEMPLATE_ES, ar: process.env.REMINDER_TEMPLATE_AR };
+const sendOutside = async (to: string, text: string, lang: "en" | "es" | "ar") => {
   const name = clientTemplates[lang];
   if (!name) throw new Error(`Falta REMINDER_TEMPLATE_${lang.toUpperCase()}: no se puede escribir al cliente fuera de las 24 h`);
   await channel.sendTemplate(to, name, lang, text);
@@ -51,6 +51,7 @@ const app = new Vassist({
   allowed,
   ownerPhone: owner || undefined,
   autoBook: true,
+  askLanguage: true,
   sendOutside,
 });
 

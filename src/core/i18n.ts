@@ -1,13 +1,20 @@
 import type { Proposal, ReminderKind, Suggestion } from "./store";
 import type { Lang } from "./types";
 
-/** Detecta el idioma por la escritura. Con poco texto, mantiene el anterior. */
+/**
+ * Detecta el cambio de escritura. El inglés y el español comparten alfabeto, así que no se distinguen:
+ * se respeta el que el cliente eligió con los botones. Con poco texto, mantiene el anterior.
+ */
 export function detectLang(text: string, fallback: Lang): Lang {
   const letters = text.replace(/[^\p{L}]/gu, "");
   if (letters.length < 3) return fallback;
   const arabic = (letters.match(/[؀-ۿ]/g) ?? []).length;
-  return arabic / letters.length > 0.4 ? "ar" : "en";
+  if (arabic / letters.length > 0.4) return "ar";
+  return fallback === "ar" ? "en" : fallback;
 }
+
+export const LANG_PICK = "Choose your language · Elige tu idioma · اختر لغتك";
+export const LANG_NAMES: Record<Lang, string> = { en: "English", es: "Español", ar: "العربية" };
 
 /** "2026-11-12T14:00:00+03:00" -> "2026-11-12 14:00" (hora local del destino tal como se guardó). */
 const when = (v: unknown) => (typeof v === "string" ? v.slice(0, 16).replace("T", " ") : "");
@@ -23,6 +30,7 @@ export type MenuTexts = {
   rowBookings: string;
   rowPrefs: string;
   rowContact: (owner: string) => string;
+  rowLang: string;
   whatNeed: string;
   typeFlight: string;
   typeHotel: string;
@@ -160,6 +168,7 @@ export const T: Record<Lang, Texts> = {
       rowBookings: "My bookings",
       rowPrefs: "My preferences",
       rowContact: (o) => `Talk to ${o}`,
+      rowLang: "Language",
       whatNeed: "What do you need?",
       typeFlight: "Flight",
       typeHotel: "Hotel",
@@ -250,6 +259,143 @@ export const T: Record<Lang, Texts> = {
       }
     },
   },
+  es: {
+    welcome:
+      "Bienvenido a VASSIST, su asistente personal de viajes. Soy un asistente de inteligencia artificial, no una persona, y solo le ayudo con viajes, a cualquier destino y por cualquier medio: vuelos, trenes, viajes en coche, hoteles, restaurantes, actividades e itinerarios.\n\nNunca se reserva ni se paga nada sin su aprobación. ¿Planificamos su próximo viaje? ¿A dónde viaja y cuándo?",
+    unsupported: "Por ahora solo puedo trabajar por escrito. ¿Podría enviarme su petición como mensaje de texto, por favor?",
+    error: "Lo siento, algo ha fallado por mi parte. He avisado al equipo y le responderemos en breve.",
+    alreadyHandled: "Esa petición ya se ha gestionado.",
+    approve: "Aprobar",
+    reject: "Rechazar",
+    approved: (t) => `Gracias. Aprobado: ${t}.\nLo he pasado para su confirmación y le avisaré aquí en cuanto esté confirmado. No se ha cobrado nada.`,
+    rejected: (t) => `Entendido, he descartado: ${t}.\n¿Quiere que busque una alternativa?`,
+    proposalPrompt: (p) => `${p.title}\n${p.details}\nTotal: ${money(p.amountEur)}\n\n¿Aprueba esta opción?`,
+    rateAsk: "Su plan está completo. ¿Cómo lo valoraría en conjunto?",
+    rateLabel: "Valorar",
+    scale: ["Malo", "Regular", "Bueno", "Muy bueno", "Excelente"],
+    askElements: "Gracias. ¿Quiere valorar también cada elemento? Es opcional y me ayuda a conocer sus preferencias.",
+    yes: "Sí",
+    noThanks: "No, gracias",
+    elementAsk: (t) => `¿Qué tal: ${t}?`,
+    skip: "Omitir",
+    thanks: "Gracias por su opinión. Queda anotada.",
+    suggestion: (s) => {
+      const { n, avg } = s.evidence;
+      switch (s.key) {
+        case "preferred_airlines":
+          return `He visto que valoró bien ${n} vuelos con ${s.value} (media ${avg}/5). ¿Añado ${s.value} a sus aerolíneas preferidas?`;
+        case "avoid_airlines":
+          return `He visto que valoró mal ${n} vuelos con ${s.value} (media ${avg}/5). ¿Evito ${s.value} en las próximas búsquedas?`;
+        case "direct_only":
+          return `Valoró bien ${n} vuelos directos (media ${avg}/5). ¿Le propongo solo vuelos directos a partir de ahora?`;
+        case "hotel_min_stars":
+          return `Valoró bien ${n} hoteles de ${s.value} estrellas o más (media ${avg}/5). ¿Fijo ${s.value} estrellas como mínimo?`;
+      }
+    },
+    suggestionYes: "Sí, actualizar",
+    suggestionNo: "No, dejarlo así",
+    suggestionAccepted: "Hecho, he actualizado sus preferencias.",
+    suggestionDeclined: "Entendido, lo dejo como está.",
+    menu: {
+      main: "¿En qué puedo ayudarle hoy?",
+      mainLabel: "Menú",
+      rowNew: "Vuelos y hoteles",
+      rowPlan: "Planificar un viaje",
+      rowLang: "Idioma",
+      planAsk: "Con gusto. Cuénteme en un mensaje a dónde quiere ir (cualquier ciudad, pueblo o país), más o menos cuándo y cómo le gustaría viajar (avión, tren, coche u otro). Le preguntaré el resto: presupuesto, quién viaja, preferencias e intereses.",
+      rowBookings: "Mis reservas",
+      rowPrefs: "Mis preferencias",
+      rowContact: (o) => `Hablar con ${o}`,
+      whatNeed: "¿Qué necesita?",
+      typeFlight: "Vuelo",
+      typeHotel: "Hotel",
+      typeFull: "Viaje completo",
+      whereTo: "¿A dónde?",
+      destLabel: "Destino",
+      destOther: "Otro destino",
+      destAsk: "Escriba la ciudad de destino o su código de aeropuerto de 3 letras, por ejemplo LHR.",
+      destBad: "No he podido reconocer ese lugar. Envíeme el código de aeropuerto de 3 letras del destino, por ejemplo LHR, o escriba \"menú\" para empezar de nuevo.",
+      nights: "¿Cuántas noches?",
+      nightsOther: "Otro número",
+      nightsAsk: "Escriba el número de noches.",
+      nightsBad: "Escriba un número de noches entre 1 y 30.",
+      date: "¿Fecha de salida?",
+      dateLabel: "Fecha",
+      dateOther: "Otra fecha",
+      dateAsk: "Escriba la fecha, por ejemplo 2026-11-12.",
+      dateBad: "No he podido leer esa fecha. Use el formato 2026-11-12 y un día futuro.",
+      originAsk: "¿Desde qué aeropuerto saldrá? Escriba el código de 3 letras, por ejemplo AGP.",
+      originBad: "Envíeme un código de aeropuerto de 3 letras, por ejemplo AGP.",
+      flights: (f, t, d) => `Vuelos de ${f} a ${t} el ${d}:`,
+      hotels: (c, n) => `Hoteles en ${c} para ${n} noche${n === 1 ? "" : "s"}:`,
+      choose: "Elegir",
+      recommended: "recomendado",
+      direct: "directo",
+      stops: (n) => `${n} escala${n === 1 ? "" : "s"}`,
+      refundable: "reembolsable",
+      perNight: "por noche",
+      stars: (n) => `${n} estrellas`,
+      onlineCheckin: "check-in online",
+      digitalKey: "llave digital",
+      noFlights: "No he encontrado vuelos ese día que encajen con sus preferencias. Elija otra fecha, por favor.",
+      noHotels: "No he encontrado hoteles que encajen con sus preferencias en esas fechas. Escríbame y buscaré alternativas.",
+      returnAsk: (d) => `¿Quiere el vuelo de vuelta el ${d}?`,
+      returnFlights: (f, t, d) => `Vuelos de vuelta de ${f} a ${t} el ${d}:`,
+      yes: "Sí",
+      no: "No, gracias",
+      done: "Sus propuestas están arriba, a la espera de su aprobación. Puede escribirme en cualquier momento si quiere cambiar algo.",
+      bookingsNone: "Todavía no tiene reservas.",
+      bookingsTitle: "Sus reservas:",
+      statusPending: "pendiente de su aprobación",
+      statusApproved: "aprobada, en proceso de confirmación",
+      statusConfirmed: "confirmada",
+      prefsNone: "Todavía no tengo preferencias guardadas. Cuénteme qué prefiere, por ejemplo: me gusta el asiento de ventanilla y los hoteles con check-in online.",
+      prefsTitle: "Sus preferencias:",
+      prefsFooter: "Para cambiar alguna, escríbame.",
+      prefLabels: {
+        home_airport: "Aeropuerto de origen",
+        preferred_airlines: "Aerolíneas preferidas",
+        avoid_airlines: "Aerolíneas a evitar",
+        seat: "Asiento",
+        direct_only: "Solo vuelos directos",
+        hotel_min_stars: "Estrellas mínimas del hotel",
+        require_online_checkin: "Check-in online obligatorio",
+        diet: "Dieta",
+        budget: "Presupuesto",
+        transport_modes: "Transporte preferido",
+        interests: "Intereses",
+        pace: "Ritmo de viaje",
+        accommodation: "Alojamiento",
+        notes: "Notas",
+      },
+      yesWord: "sí",
+      contactDone: (o) => `He avisado a ${o}. Le responderá aquí, por escrito, en cuanto pueda.`,
+      stale: "Esa opción ya no está activa. Aquí tiene el menú.",
+      flightTitle: (f, t, d, a) => `Vuelo ${f} a ${t}, ${d}, ${a}`,
+      hotelDetails: (n, d, s) => `${n} noche${n === 1 ? "" : "s"} desde el ${d} · ${s} estrellas`,
+    },
+    confirmed: (t) => `Buenas noticias: ${t} está confirmado. Le recordaré antes del check-in.`,
+    autoBooked: (t, ref, sim) =>
+      sim
+        ? `Reservado: ${t}. Referencia ${ref}.\nMODO DE PRUEBA: es una reserva simulada, no se ha reservado ni cobrado nada real.`
+        : `Reservado: ${t}. Referencia ${ref}. Le recordaré antes del check-in.`,
+    manualRequested: (t) =>
+      `Gracias. Para ${t} nuestro equipo necesita hablar directamente con el proveedor. María contactará con ellos y le escribirá aquí. No puedo prometer un plazo y no se ha cobrado nada.`,
+    bookingFailed: (t) => `Lo siento, no he podido completar la reserva de ${t}. He avisado a María, que le escribirá aquí. No se ha cobrado nada.`,
+    declined: (t) => `Lo siento, ${t} no es posible. ¿Quiere que busque una alternativa?`,
+    reminder: (kind, p) => {
+      const a = p.attrs;
+      const link = typeof a.checkin_url === "string" ? a.checkin_url : "";
+      switch (kind) {
+        case "flight_checkin":
+          return `Recordatorio: ${p.title}, salida ${when(a.starts_at)}.\nEl check-in online suele abrir unas 24 horas antes de la salida, aunque cada aerolínea fija su plazo. ${link ? `Enlace oficial: ${link}` : "Use la web o la app de la aerolínea."}\nTodavía no puedo hacer el check-in por usted.`;
+        case "hotel_checkin":
+          return `Recordatorio: ${p.title}, check-in ${when(a.starts_at)}.\n${a.online_checkin === true && link ? `Puede hacer el check-in online aquí: ${link}` : a.online_checkin === true ? "El hotel ofrece check-in online; use el enlace de su confirmación de reserva." : "El check-in es en recepción."}${a.digital_key === true ? "\nEl hotel ofrece llave digital en el móvil." : ""}\nSi quiere un check-in anticipado, dígamelo y preparo la solicitud.`;
+        case "hotel_checkout":
+          return `Recordatorio: el check-out de ${p.title} es ${when(a.ends_at)}.\nSi necesita un check-out tardío, dígamelo y preparo la solicitud.`;
+      }
+    },
+  },
   ar: {
     welcome:
       "أهلاً بكم في VASSIST، مساعدكم الشخصي للسفر. أنا مساعد آلي يعمل بالذكاء الاصطناعي ولست إنساناً، وأقتصر على خدمات السفر إلى أي وجهة وبأي وسيلة: الطائرة والقطار والسيارة والفنادق والمطاعم والأنشطة وجداول الرحلات.\n\nلا يتم أي حجز ولا دفع دون موافقتكم. هل نبدأ بالتخطيط لرحلتكم القادمة؟ إلى أين تودّون السفر، ومتى؟",
@@ -296,6 +442,7 @@ export const T: Record<Lang, Texts> = {
       rowBookings: "حجوزاتي",
       rowPrefs: "تفضيلاتي",
       rowContact: (o) => `التواصل مع ${o}`,
+      rowLang: "اللغة",
       whatNeed: "ماذا تحتاجون؟",
       typeFlight: "رحلة جوية",
       typeHotel: "فندق",

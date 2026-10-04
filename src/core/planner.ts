@@ -22,7 +22,7 @@ export interface PlannerHost {
   approve(user: User, proposalId: string): Promise<void>;
 }
 
-type L2 = { en: string; ar: string };
+type L2 = { en: string; ar: string; es?: string };
 type Opt = { v: string } & L2;
 type Ctx = { user: User; prefs: Record<string, unknown>; recent: string[]; today: string };
 const addDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
@@ -39,6 +39,36 @@ type Q = {
 
 const o = (v: string, en: string, ar: string): Opt => ({ v, en, ar });
 
+const ES: Record<string, string> = {
+  "Destination": "Destino", "Where would you like to go?": "¿A dónde le gustaría ir?", "Another place": "Otro lugar",
+  "Please write the place: any city, town, region or country.": "Escriba el lugar: cualquier ciudad, pueblo, región o país.",
+  "City, town, region or country": "Ciudad, pueblo, región o país",
+  "Departing from": "Salida desde", "Where will you travel from?": "¿Desde dónde viajará?",
+  "Please write the city or airport you will depart from.": "Escriba la ciudad o el aeropuerto de salida.", "City or airport": "Ciudad o aeropuerto",
+  "Purpose": "Motivo", "What is the purpose of the trip?": "¿Cuál es el motivo del viaje?", "Business": "Trabajo", "Medical": "Salud", "Leisure": "Ocio", "Family": "Familiar", "Event or conference": "Evento o congreso",
+  "When": "Cuándo", "When would you like to travel?": "¿Cuándo le gustaría viajar?", "In 3 days": "En 3 días", "In 1 week": "En 1 semana", "In 2 weeks": "En 2 semanas", "In 1 month": "En 1 mes", "In 2 to 3 months": "En 2 o 3 meses",
+  "Exact date": "Fecha exacta", "Please write the departure date, for example 2026-11-12.": "Escriba la fecha de salida, por ejemplo 2026-11-12.",
+  "Nights": "Noches", "How many nights will you stay?": "¿Cuántas noches se alojará?", "2 nights": "2 noches", "4 nights": "4 noches", "1 week": "1 semana", "10 nights": "10 noches", "2 weeks": "2 semanas",
+  "Other number": "Otro número", "Please write the number of nights, for example 5.": "Escriba el número de noches, por ejemplo 5.", "Number of nights": "Número de noches",
+  "Travellers": "Viajeros", "Who is travelling?": "¿Quién viaja?", "Just me": "Solo yo", "2 adults": "2 adultos", "Family with children": "Familia con niños", "Group of 3 to 5": "Grupo de 3 a 5", "Group of 6 or more": "Grupo de 6 o más",
+  "Budget": "Presupuesto", "What budget level do you have in mind?": "¿Qué nivel de presupuesto tiene en mente?", "Economy": "Económico", "Comfortable": "Cómodo", "Premium": "Premium", "Luxury": "Lujo", "No limit": "Sin límite",
+  "Set an amount": "Indicar una cifra", "Please write your total budget with the currency, for example 3000 EUR.": "Escriba su presupuesto total con la moneda, por ejemplo 3000 EUR.", "For example 3000 EUR": "Por ejemplo 3000 EUR",
+  "Getting there": "Medio de transporte", "How would you like to travel?": "¿Cómo le gustaría viajar?", "Plane": "Avión", "Train": "Tren", "Car, I drive": "Coche, conduzco yo", "Car with driver": "Coche con chófer", "Bus or ferry": "Autobús o ferri", "Recommend me": "Recomiéndeme",
+  "Accommodation": "Alojamiento", "What kind of accommodation?": "¿Qué tipo de alojamiento prefiere?", "Hotel 3 stars": "Hotel 3 estrellas", "Hotel 4 stars": "Hotel 4 estrellas", "Hotel 5 stars": "Hotel 5 estrellas", "Boutique hotel": "Hotel boutique", "Apartment": "Apartamento", "Not needed": "No lo necesito",
+  "Food": "Comida", "Any dietary requirements?": "¿Tiene requisitos alimentarios?", "No restrictions": "Sin restricciones", "Halal": "Halal", "Vegetarian": "Vegetariano", "Vegan": "Vegano", "Other": "Otro",
+  "Please write your dietary requirements.": "Escriba sus requisitos alimentarios.", "Your dietary requirements": "Sus requisitos alimentarios",
+  "Interests": "Intereses", "What do you enjoy? Choose up to 3, then press Done.": "¿Qué le gusta? Elija hasta 3 y pulse Hecho.", "Culture and history": "Cultura e historia", "Nature and outdoors": "Naturaleza y aire libre", "Shopping": "Compras", "Wellness and spa": "Bienestar y spa", "Gastronomy": "Gastronomía", "Family activities": "Actividades en familia", "Nightlife": "Vida nocturna",
+  "Pace": "Ritmo", "How full should the days be?": "¿Cómo de llenos quiere los días?", "Relaxed": "Tranquilo", "Balanced": "Equilibrado", "Packed": "Intenso",
+  "Notes": "Notas", "Anything else I should know?": "¿Algo más que deba saber?", "No, that is all": "No, eso es todo", "Add a note": "Añadir una nota", "Please write your note.": "Escriba su nota.", "Your note": "Su nota",
+};
+/** Texto de una pregunta u opción en el idioma del cliente. El español sale de ES por el texto en inglés. */
+const tr = (x: L2, lang: Lang): string => (lang === "es" ? (x.es ?? ES[x.en] ?? x.en) : x[lang]);
+/** Para las pruebas: textos en inglés sin traducción al español. */
+export const untranslatedSpanish = (): string[] => {
+  const all = QS.flatMap((q) => [q.name, q.ask, ...(q.other ? [q.other.label, q.other.ask, q.other.placeholder] : []), ...q.opts({ user: { lang: "en" } as User, prefs: {}, recent: [], today: "2026-10-04" })]);
+  return [...new Set(all.map((x) => x.en))].filter((e) => !ES[e] && !/^\d{4}-\d{2}-\d{2}$/.test(e));
+};
+
 const QS: Q[] = [
   {
     key: "destination",
@@ -51,7 +81,7 @@ const QS: Q[] = [
     key: "origin",
     name: { en: "Departing from", ar: "الانطلاق من" },
     ask: { en: "Where will you travel from?", ar: "من أين ستنطلقون؟" },
-    opts: (c) => (typeof c.prefs.home_airport === "string" && c.prefs.home_airport ? [o(c.prefs.home_airport, `From ${c.prefs.home_airport}`, `من ${c.prefs.home_airport}`)] : []),
+    opts: (c) => (typeof c.prefs.home_airport === "string" && c.prefs.home_airport ? [{ ...o(c.prefs.home_airport, `From ${c.prefs.home_airport}`, `من ${c.prefs.home_airport}`), es: `Desde ${c.prefs.home_airport}` }] : []),
     other: { label: { en: "Another place", ar: "مكان آخر" }, ask: { en: "Please write the city or airport you will depart from.", ar: "اكتبوا المدينة أو المطار الذي ستنطلقون منه." }, placeholder: { en: "City or airport", ar: "المدينة أو المطار" } },
   },
   {
@@ -221,6 +251,41 @@ const TX = {
     total: (n: number, eur: number) => `${n} night${n === 1 ? "" : "s"}: EUR ${eur}`,
     sample: "Sample data: price, photo and map pin are for testing until a live provider is connected.",
   },
+  es: {
+    start: "Planifiquemos su viaje. Le haré unas preguntas; solo tiene que pulsar sus respuestas.",
+    other: "Otro",
+    done: "Hecho",
+    skip: "Omitir el resto",
+    pick: "Elegir",
+    summary: "Este es el resumen de su viaje:",
+    go: "Crear mi plan",
+    redo: "Empezar de nuevo",
+    cancel: "Cancelar",
+    stale: "Esa opción ya no está activa. Continúe más abajo, por favor.",
+    working: "Gracias. Estoy preparando su plan, un momento por favor.",
+    make: "Crear propuestas",
+    adjust: "Ajustar el plan",
+    afterPlan: "¿Qué quiere hacer con este plan?",
+    adjustAsk: "Por supuesto. Dígame con sus palabras qué quiere cambiar.",
+    makeText: "Sí, por favor, crea las propuestas para este plan.",
+    notSet: "Sin especificar",
+    cancelled: "Planificador cancelado. Escriba \"menú\" cuando me necesite.",
+    stays: "Hoteles y apartamentos",
+    back: "Volver a la lista",
+    book: "Reservar",
+    staysHead: (city: string, n: number, from: string) => `Alojamientos en ${city}, ${n} noche${n === 1 ? "" : "s"} desde el ${from}. Pulse uno para verlo:`,
+    staysNone: "No he encontrado alojamientos para esas fechas. Puede ajustar el plan e intentarlo de nuevo.",
+    staysGone: "Esos resultados ya no están disponibles. Pulse de nuevo Hoteles y apartamentos.",
+    hotel: "Hotel",
+    apartment: "Apartamento",
+    perNight: "por noche",
+    freeCancel: "cancelación gratuita",
+    onlineCheckin: "check-in online",
+    digitalKey: "llave digital",
+    km: "km del centro",
+    total: (n: number, eur: number) => `${n} noche${n === 1 ? "" : "s"}: EUR ${eur}`,
+    sample: "Datos de muestra: el precio, la foto y el pin del mapa son de prueba hasta conectar un proveedor real.",
+  },
   ar: {
     start: "لنخطط لرحلتكم. سأطرح بضعة أسئلة، وما عليكم سوى الضغط على إجاباتكم.",
     other: "غير ذلك",
@@ -304,30 +369,30 @@ export class Planner {
       await this.prompt(user, q);
       return;
     }
-    const list: Row[] = all.flatMap((x, idx) => (w.sel.includes(x.v) ? [] : [{ id: `p:${w.i}:${idx}`, title: clip(x[lang], 24) }]));
+    const list: Row[] = all.flatMap((x, idx) => (w.sel.includes(x.v) ? [] : [{ id: `p:${w.i}:${idx}`, title: clip(tr(x, lang), 24) }]));
     if (q.multi) list.unshift({ id: `p:${w.i}:d`, title: `✓ ${tx.done}${w.sel.length ? ` (${w.sel.length})` : ""}` });
-    if (q.other && list.length < 10) list.push({ id: `p:${w.i}:o`, title: clip(q.other.label[lang], 24) });
+    if (q.other && list.length < 10) list.push({ id: `p:${w.i}:o`, title: clip(tr(q.other.label, lang), 24) });
     if (w.i >= 3 && list.length < 10) list.push({ id: `p:${w.i}:s`, title: tx.skip });
-    await this.h.channel.sendList(user.id, `${w.i + 1}/${QS.length} · ${q.ask[lang]}`, tx.pick, list);
+    await this.h.channel.sendList(user.id, `${w.i + 1}/${QS.length} · ${tr(q.ask, lang)}`, tx.pick, list);
   }
 
   /** Pregunta abierta: con recuadro de respuesta si el canal lo permite. */
   private async prompt(user: User, q: Q) {
     const other = q.other;
     if (!other) return;
-    if (this.h.channel.sendPrompt) await this.h.channel.sendPrompt(user.id, other.ask[user.lang], other.placeholder[user.lang]);
-    else await this.h.channel.sendText(user.id, other.ask[user.lang]);
+    if (this.h.channel.sendPrompt) await this.h.channel.sendPrompt(user.id, tr(other.ask, user.lang), tr(other.placeholder, user.lang));
+    else await this.h.channel.sendText(user.id, tr(other.ask, user.lang));
   }
 
   private label(q: Q, value: string, lang: Lang): string {
     // El resumen enseña la opción en el idioma del cliente cuando es una de las predefinidas.
     const found = q.opts({ user: { lang } as User, prefs: {}, recent: [], today: this.today() }).find((x) => x.v === value);
-    return found ? found[lang] : value;
+    return found ? tr(found, lang) : value;
   }
 
   private async summary(user: User, w: State) {
     const tx = TX[user.lang];
-    const lines = QS.map((q) => `• ${q.name[user.lang]}: ${w.a[q.key] ? this.label(q, w.a[q.key]!, user.lang) : tx.notSet}`);
+    const lines = QS.map((q) => `• ${tr(q.name, user.lang)}: ${w.a[q.key] ? this.label(q, w.a[q.key]!, user.lang) : tx.notSet}`);
     await this.h.channel.sendButtons(user.id, `${tx.summary}\n\n${lines.join("\n")}`, [
       { id: "p:go", title: tx.go },
       { id: "p:redo", title: tx.redo },

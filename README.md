@@ -1,6 +1,6 @@
 # VASSIST
 
-Asistente personal de viajes por WhatsApp, en inglés y árabe, solo por escrito. Prepara propuestas (vuelos, hoteles, restaurantes, traslados); el cliente las aprueba con botones; nada se reserva ni se cobra desde el bot. Tras cada plan pide valoraciones y propone cambios de preferencias que el cliente debe confirmar.
+Asistente personal de viajes por WhatsApp, en español, inglés y árabe, solo por escrito. Prepara propuestas (vuelos, hoteles, restaurantes, traslados); el cliente las aprueba con botones; nada se reserva ni se cobra desde el bot. Tras cada plan pide valoraciones y propone cambios de preferencias que el cliente debe confirmar.
 
 ## Qué hay (fase 1)
 
@@ -50,6 +50,10 @@ Los pasos de Meta cambian de pantalla con frecuencia; verifica cada uno en la do
 7. `OWNER_PHONE` con tu WhatsApp para recibir avisos. Fuera de la ventana de 24 h Meta exige plantilla: crea una de categoría **Utility** con una variable en el cuerpo y ponla en `OWNER_TEMPLATE`.
 8. Crea además dos plantillas **Utility** (una en inglés y otra en árabe, una variable en el cuerpo) y ponlas en `REMINDER_TEMPLATE_EN` y `REMINDER_TEMPLATE_AR`. Sin ellas, los recordatorios solo llegan si el cliente ha escrito al bot en las últimas 24 h.
 9. `npm start`.
+
+## Idioma
+
+Al primer mensaje el bot pregunta el idioma con tres botones (**Español · English · العربية**) y todo sale en el elegido: menú, planificador, avisos y recordatorios. Se cambia en cualquier momento con **Idioma** en el menú. Escribir en otro idioma no lo cambia (solo detecta el cambio a escritura árabe). Los clientes que ya existían no vuelven a ver el selector. Para WhatsApp fuera de las 24 h, crea además una plantilla Utility en español y ponla en `REMINDER_TEMPLATE_ES`. El español usa «usted»; los textos en árabe siguen pendientes de revisión nativa.
 
 ## Planificador de viajes por botones (cualquier destino y medio)
 

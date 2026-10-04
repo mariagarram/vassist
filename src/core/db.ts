@@ -96,5 +96,11 @@ export function openDb(path = process.env.DB_PATH ?? "data/vassist.db"): Databas
   // Bases de datos creadas antes de existir la confirmación de reservas.
   const cols = db.prepare("PRAGMA table_info(proposals)").all() as { name: string }[];
   if (!cols.some((c) => c.name === "confirmed_at")) db.exec("ALTER TABLE proposals ADD COLUMN confirmed_at TEXT");
+  // Idioma elegido por el cliente. Los clientes que ya existían se dan por elegidos: no se les vuelve a preguntar.
+  const ucols = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
+  if (!ucols.some((c) => c.name === "lang_set")) {
+    db.exec("ALTER TABLE users ADD COLUMN lang_set INTEGER NOT NULL DEFAULT 0");
+    db.exec("UPDATE users SET lang_set = 1");
+  }
   return db;
 }

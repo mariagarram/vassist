@@ -72,7 +72,7 @@ export class Menu {
     return isoDay(this.h.now());
   }
   private fmtDate(iso: string, lang: Lang) {
-    return new Intl.DateTimeFormat(lang === "ar" ? "ar-u-ca-gregory-nu-latn" : "en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
+    return new Intl.DateTimeFormat(lang === "ar" ? "ar-u-ca-gregory-nu-latn" : lang === "es" ? "es-ES" : "en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
   }
   private money = (n: number) => `EUR ${n.toFixed(0)}`;
 
@@ -86,6 +86,7 @@ export class Menu {
       { id: "m:book", title: m.rowBookings },
       { id: "m:prefs", title: m.rowPrefs },
       { id: "m:contact", title: m.rowContact(this.h.ownerName) },
+      { id: "m:lang", title: m.rowLang },
     ]);
   }
 

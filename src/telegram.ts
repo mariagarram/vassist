@@ -35,6 +35,7 @@ const app = new Vassist({
   allowed,
   ownerPhone: owner || undefined,
   autoBook: true,
+  askLanguage: true,
 });
 
 setInterval(() => void app.tick().catch((err) => console.error("[vassist] tick:", err)), 30_000);

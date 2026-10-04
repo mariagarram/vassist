@@ -1,6 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 
-export type Lang = "en" | "ar";
+export type Lang = "en" | "es" | "ar";
 
 /** Evento entrante, ya normalizado e independiente del canal. */
 export type Incoming =

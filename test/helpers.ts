@@ -70,7 +70,7 @@ export class ScriptedLlm implements Llm {
 export const CLIENT = "966500000001";
 export const OWNER = "34600000000";
 
-export function setup(opts: { autoBook?: boolean } = {}) {
+export function setup(opts: { autoBook?: boolean; askLanguage?: boolean } = {}) {
   const store = new Store(openDb(":memory:"));
   const channel = new FakeChannel();
   const llm = new ScriptedLlm();
@@ -88,6 +88,7 @@ export function setup(opts: { autoBook?: boolean } = {}) {
     now: () => clock.now,
     ownerPhone: OWNER,
     autoBook: opts.autoBook ?? false,
+    askLanguage: opts.askLanguage ?? false,
     sendOutside: async (to, text, lang) => {
       if (failOutside) throw new Error("template rejected");
       outside.push({ to, text, lang });

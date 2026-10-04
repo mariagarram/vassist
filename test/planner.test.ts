@@ -195,3 +195,41 @@ test("restaurante: el cliente lo solicita, María recibe la petición y /decline
   assert.ok(c.channel.sent.some((m) => m.kind === "text" && m.to === CLIENT && /not possible/.test(m.text)));
   assert.equal(c.store.getProposal(id)!.status, "rejected");
 });
+
+test("idioma: al empezar elige Español, English o العربية; el resto sale en el idioma elegido", async () => {
+  const c = setup({ askLanguage: true });
+  await c.text("hola");
+  assert.deepEqual(ids(c), ["l:en", "l:es", "l:ar"]);
+  assert.match((last(c) as { body: string }).body, /Elige tu idioma/);
+  await c.click("l:es");
+  assert.match(texts(c).at(-1)!, /Bienvenido a VASSIST/);
+  assert.ok(ids(c).includes("m:lang"));
+  await tap(c, "m:plan");
+  assert.match(texts(c).at(-1)!, /Escriba el lugar/);
+  await c.text("Granada");
+  await c.text("Málaga");
+  assert.match((last(c) as { body: string }).body, /¿Cuál es el motivo del viaje\?/);
+  // escribir en español no cambia el idioma elegido
+  await c.text("gracias por todo");
+  assert.equal(c.store.getUser(CLIENT)!.lang, "es");
+  // cambiar de idioma desde el menú
+  await c.text("menú");
+  await tap(c, "m:lang");
+  await c.click("l:en");
+  assert.equal(c.store.getUser(CLIENT)!.lang, "en");
+  assert.ok(!texts(c).at(-1)!.includes("Bienvenido"), "la bienvenida solo se da la primera vez");
+});
+
+test("español: todas las preguntas del planificador están traducidas", async () => {
+  const { untranslatedSpanish } = await import("../src/core/planner");
+  assert.deepEqual(untranslatedSpanish(), []);
+});
+
+test("los clientes que ya existían no vuelven a ver el selector de idioma", async () => {
+  const c = setup({ askLanguage: true });
+  c.store.upsertUser(CLIENT, "Client");
+  c.store.chooseLang(CLIENT, "en");
+  await c.text("hello");
+  assert.match((last(c) as { body: string }).body, /How can I help you today/);
+  assert.ok(!ids(c).includes("l:es"));
+});

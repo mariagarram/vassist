@@ -1,5 +1,5 @@
 import { runAgent } from "./agent";
-import { T, detectLang } from "./i18n";
+import { LANG_NAMES, LANG_PICK, T, detectLang } from "./i18n";
 import { applySuggestion, deriveSuggestions } from "./insights";
 import { providers as defaultProviders, type TravelProvider } from "./providers";
 import { Menu } from "./menu";
@@ -34,10 +34,12 @@ export type Deps = {
    * avisos si falla. El resto (restaurantes, guías, traslados, actividades...) lo gestiona ella con /confirm o /decline.
    */
   autoBook?: boolean;
+  /** Al primer mensaje, el cliente elige idioma (Español / English / العربية) con botones. */
+  askLanguage?: boolean;
 };
 
 /** Palabras con las que el cliente pide el menú. */
-const MENU_WORDS = /^\/?(menu|menú|inicio|hi|hello|hey|salam|salaam|good (morning|afternoon|evening)|القائمة|قائمة|مرحبا|مرحباً|أهلا|أهلاً|اهلا|السلام عليكم|صباح الخير|مساء الخير)[.!؟?\s]*$/i;
+const MENU_WORDS = /^\/?(menu|menú|inicio|hi|hello|hey|hola|buenas|buenos d[ií]as|buenas tardes|buenas noches|salam|salaam|good (morning|afternoon|evening)|القائمة|قائمة|مرحبا|مرحباً|أهلا|أهلاً|اهلا|السلام عليكم|صباح الخير|مساء الخير)[.!؟?\s]*$/i;
 
 const MAX_TEXT = 3800;
 
@@ -182,8 +184,9 @@ export class Vassist {
     const isNew = !store.getUser(msg.from);
     const user = store.upsertUser(msg.from, msg.name);
 
-    if (msg.kind === "unsupported") return channel.sendText(user.id, T[user.lang].unsupported);
     if (msg.kind === "reply") return this.onReply(user, msg.replyId);
+    if (this.d.askLanguage && !store.langChosen(user.id)) return this.pickLanguage(user);
+    if (msg.kind === "unsupported") return channel.sendText(user.id, T[user.lang].unsupported);
 
     const lang = detectLang(msg.text, user.lang);
     if (lang !== user.lang) store.setLang(user.id, lang);
@@ -202,6 +205,10 @@ export class Vassist {
     // Texto libre: lo atiende la IA y se abandona cualquier paso del menú a medias.
     store.clearWizard(user.id);
     await this.runTurn(current, msg.text);
+  }
+
+  private async pickLanguage(user: User) {
+    await this.d.channel.sendButtons(user.id, LANG_PICK, (Object.keys(LANG_NAMES) as Lang[]).map((l) => ({ id: `l:${l}`, title: LANG_NAMES[l] })));
   }
 
   private async runTurn(user: User, text: string) {
@@ -324,6 +331,16 @@ export class Vassist {
         return this.maybeAskRating(user, decided.planId);
       }
 
+      case "l": {
+        if (!(a in LANG_NAMES)) return;
+        const lang = a as Lang;
+        const first = !store.langChosen(user.id);
+        store.chooseLang(user.id, lang);
+        const chosen = { ...user, lang };
+        if (first) await channel.sendText(user.id, T[lang].welcome);
+        return this.menu.show(chosen);
+      }
+
       case "rg": {
         const plan = store.getPlan(a);
         if (!plan || plan.userId !== user.id || !validScore) return;
@@ -366,6 +383,7 @@ export class Vassist {
       }
 
       default:
+        if (replyId === "m:lang") return this.pickLanguage(user);
         if (replyId === "m:plan") return this.planner.start(user);
         if (await this.planner.onReply(user, replyId)) return;
         if (await this.menu.onReply(user, replyId)) return;

@@ -60,10 +60,17 @@ export class Store {
   }
   getUser(id: string): User | undefined {
     const r = this.one("SELECT id, name, lang FROM users WHERE id = ?", id);
-    return r ? { id: String(r.id), name: (r.name as string | null) ?? null, lang: r.lang === "ar" ? "ar" : "en" } : undefined;
+    return r ? { id: String(r.id), name: (r.name as string | null) ?? null, lang: r.lang === "ar" ? "ar" : r.lang === "es" ? "es" : "en" } : undefined;
   }
   setLang(id: string, lang: Lang) {
     this.run("UPDATE users SET lang = ? WHERE id = ?", lang, id);
+  }
+  /** El cliente ha elegido idioma con los botones. */
+  chooseLang(id: string, lang: Lang) {
+    this.run("UPDATE users SET lang = ?, lang_set = 1 WHERE id = ?", lang, id);
+  }
+  langChosen(id: string): boolean {
+    return Number(this.one("SELECT lang_set FROM users WHERE id = ?", id)?.lang_set ?? 0) === 1;
   }
 
   // ---- preferencias ----
