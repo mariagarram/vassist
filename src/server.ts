@@ -50,6 +50,7 @@ const app = new Vassist({
   notifyOwner,
   allowed,
   ownerPhone: owner || undefined,
+  autoBook: true,
   sendOutside,
 });
 

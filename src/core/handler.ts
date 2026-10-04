@@ -5,7 +5,7 @@ import { providers as defaultProviders, type TravelProvider } from "./providers"
 import { Menu } from "./menu";
 import { Planner } from "./planner";
 import { scheduleReminders } from "./reminders";
-import type { Store, User } from "./store";
+import type { Proposal, Store, User } from "./store";
 import type { OutboxItem, ToolCtx } from "./tools";
 import type { Channel, Incoming, Lang, Llm, OwnerNotifier } from "./types";
 
@@ -29,6 +29,11 @@ export type Deps = {
   sendOutside?: (to: string, text: string, lang: Lang) => Promise<void>;
   /** Nombre con el que el cliente ve a la propietaria en el menú. */
   ownerName?: string;
+  /**
+   * Vuelos y hoteles aprobados se reservan al momento con el proveedor, sin pasar por María; ella solo recibe
+   * avisos si falla. El resto (restaurantes, guías, traslados, actividades...) lo gestiona ella con /confirm o /decline.
+   */
+  autoBook?: boolean;
 };
 
 /** Palabras con las que el cliente pide el menú. */
@@ -105,7 +110,7 @@ export class Vassist {
   }
 
   private isOwnerCommand(msg: Incoming): msg is Extract<Incoming, { kind: "text" }> {
-    return !!this.d.ownerPhone && msg.from === this.d.ownerPhone && msg.kind === "text" && /^\/(confirm|pending)\b/i.test(msg.text.trim());
+    return !!this.d.ownerPhone && msg.from === this.d.ownerPhone && msg.kind === "text" && /^\/(confirm|decline|pending)\b/i.test(msg.text.trim());
   }
 
   /** /pending lista lo aprobado sin confirmar; /confirm ID marca la reserva hecha y avisa al cliente. */
@@ -121,6 +126,13 @@ export class Vassist {
           ? "Pendientes de confirmar:\n" + list.map((p) => `${p.id} · ${p.userName ?? p.userId} · ${p.title} · EUR ${p.amountEur.toFixed(2)}`).join("\n")
           : "No hay nada pendiente de confirmar.",
       );
+    }
+    if (cmd.toLowerCase() === "/decline") {
+      const d = id ? store.declineApproved(id) : null;
+      if (!d) return channel.sendText(owner, "No encuentro una propuesta aprobada y sin confirmar con ese ID. Usa /pending para ver la lista.");
+      const u = store.getUser(d.userId);
+      if (u) await this.tell(u.id, T[u.lang].declined(d.title), u.lang);
+      return channel.sendText(owner, `Marcado como no posible: ${d.title}. Cliente avisado.`);
     }
     const p = id ? store.confirmProposal(id) : null;
     if (!p) return channel.sendText(owner, "No encuentro una propuesta aprobada y sin confirmar con ese ID. Usa /pending para ver la lista.");
@@ -236,6 +248,40 @@ export class Vassist {
     }
   }
 
+  /** Tras aprobar: reserva automática (vuelo u hotel) o petición a María (todo lo que necesita hablar con un lugar). */
+  private async fulfil(user: User, p: Proposal) {
+    const { store, channel } = this.d;
+    const t = T[user.lang];
+    const who = `${user.name ?? user.id} (${user.id})`;
+    if (this.d.autoBook && (p.kind === "flight" || p.kind === "hotel")) {
+      let result: Awaited<ReturnType<TravelProvider["book"]>>;
+      try {
+        result = await (this.d.providers ?? defaultProviders).book({ kind: p.kind, title: p.title, amountEur: p.amountEur, proposalId: p.id });
+      } catch (err) {
+        result = { ok: false, reason: err instanceof Error ? err.message : String(err) };
+      }
+      if (result.ok) {
+        const confirmed = store.confirmProposal(p.id);
+        if (confirmed) scheduleReminders(store, confirmed, this.now());
+        await channel.sendText(user.id, t.autoBooked(p.title, result.reference, result.simulated));
+        return;
+      }
+      await channel.sendText(user.id, t.bookingFailed(p.title));
+      await this.alert("high", `FALLO de reserva automática. Cliente ${who}: ${p.title} (EUR ${p.amountEur.toFixed(2)}). Motivo: ${result.reason}\nContacta al cliente. Si lo resuelves tú: /confirm ${p.id} o /decline ${p.id}`);
+      return;
+    }
+    if (p.kind === "flight" || p.kind === "hotel") {
+      await channel.sendText(user.id, t.approved(p.title));
+      await this.alert("info", `Aprobado por ${who}: ${p.title} (EUR ${p.amountEur.toFixed(2)}). ${p.details}\nReserva con el proveedor y responde: /confirm ${p.id}`);
+      return;
+    }
+    await channel.sendText(user.id, t.manualRequested(p.title));
+    await this.alert(
+      "high",
+      `PETICIÓN para contactar con el lugar. Cliente ${who}: ${p.title} (EUR ${p.amountEur.toFixed(2)}). ${p.details}\nContacta con el lugar y responde: /confirm ${p.id} si queda hecho, o /decline ${p.id} si no es posible.`,
+    );
+  }
+
   private async sendApproval(user: User, proposalId: string) {
     const p = this.d.store.getProposal(proposalId);
     if (!p) return;
@@ -273,13 +319,8 @@ export class Vassist {
       case "rj": {
         const decided = store.decideProposal(a, user.id, kind === "ap" ? "approved" : "rejected");
         if (!decided) return channel.sendText(user.id, t.alreadyHandled);
-        await channel.sendText(user.id, kind === "ap" ? t.approved(decided.title) : t.rejected(decided.title));
-        if (kind === "ap") {
-          await this.alert(
-            "info",
-            `Aprobado por ${user.name ?? user.id}: ${decided.title} (EUR ${decided.amountEur.toFixed(2)}). ${decided.details}\nReserva con el proveedor y responde: /confirm ${decided.id}`,
-          );
-        }
+        if (kind === "rj") await channel.sendText(user.id, t.rejected(decided.title));
+        else await this.fulfil(user, decided);
         return this.maybeAskRating(user, decided.planId);
       }
 

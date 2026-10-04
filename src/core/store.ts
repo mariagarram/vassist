@@ -172,6 +172,11 @@ export class Store {
     const changed = this.run("UPDATE proposals SET confirmed_at = ? WHERE id = ? AND status = 'approved' AND confirmed_at IS NULL", now(), id);
     return changed ? (this.getProposal(id) ?? null) : null;
   }
+  /** María no ha podido conseguirlo: la propuesta aprobada pasa a rechazada. null si no procede. */
+  declineApproved(id: string): Proposal | null {
+    const changed = this.run("UPDATE proposals SET status = 'rejected' WHERE id = ? AND status = 'approved' AND confirmed_at IS NULL", id);
+    return changed ? (this.getProposal(id) ?? null) : null;
+  }
   awaitingConfirmation(): (Proposal & { userName: string | null })[] {
     return this.many(
       "SELECT p.*, u.name AS user_name FROM proposals p JOIN users u ON u.id = p.user_id WHERE p.status = 'approved' AND p.confirmed_at IS NULL ORDER BY p.created_at, p.rowid",

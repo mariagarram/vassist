@@ -29,10 +29,19 @@ export type HotelOption = {
   onlineCheckin: boolean;
   /** El hotel ofrece llave digital en el móvil. */
   digitalKey: boolean;
+  /** Ubicación y foto. Con datos de prueba son de muestra: ubicación aproximada y foto genérica. */
+  lat?: number;
+  lon?: number;
+  imageUrl?: string;
+  sample?: boolean;
 };
+
+export type BookingResult = { ok: true; reference: string; simulated: boolean } | { ok: false; reason: string };
 
 export interface TravelProvider {
   searchFlights(p: { from: string; to: string; date: string; returnDate?: string }): Promise<FlightOption[]>;
+  /** Reserva real (vuelo u hotel) con el proveedor. El de pruebas solo la simula y lo declara. */
+  book(p: { kind: "flight" | "hotel"; title: string; amountEur: number; proposalId: string }): Promise<BookingResult>;
   searchHotels(p: { city: string; checkIn: string; checkOut: string; minStars?: number; onlineCheckinOnly?: boolean; includeApartments?: boolean }): Promise<HotelOption[]>;
 }
 
@@ -71,6 +80,10 @@ export const mockProvider: TravelProvider = {
     }).sort((a, b) => a.priceEur - b.priceEur);
   },
 
+  async book({ proposalId }) {
+    return { ok: true, reference: `SIM-${proposalId.slice(0, 6).toUpperCase()}`, simulated: true };
+  },
+
   async searchHotels({ city, checkIn, minStars = 3, onlineCheckinOnly = false, includeApartments = false }) {
     const rand = seeded(`${city}-${checkIn}`);
     const make = (name: string, i: number, type: "hotel" | "apartment"): HotelOption => ({
@@ -87,13 +100,34 @@ export const mockProvider: TravelProvider = {
     });
     const hotels = HOTEL_NAMES.slice(0, 4).map((n, i) => make(n, i, "hotel")).filter((h) => h.stars >= minStars);
     const apartments = includeApartments ? APARTMENT_NAMES.map((n, i) => make(n, i, "apartment")) : [];
-    return [...hotels, ...apartments]
+    const c = coordsFor(city);
+    const withMedia = (h: HotelOption): HotelOption => ({
+      ...h,
+      sample: true,
+      imageUrl: `https://picsum.photos/seed/${encodeURIComponent(h.id + city)}/800/500`,
+      ...(c ? { lat: Math.round((c[0] + (rand() - 0.5) * 0.03) * 1e5) / 1e5, lon: Math.round((c[1] + (rand() - 0.5) * 0.03) * 1e5) / 1e5 } : {}),
+    });
+    return [...hotels, ...apartments].map(withMedia)
       .filter((h) => !onlineCheckinOnly || h.onlineCheckin)
       .sort((a, b) => a.pricePerNightEur - b.pricePerNightEur);
   },
 };
 
 export const providers: TravelProvider = mockProvider;
+
+/** Centro aproximado de las ciudades conocidas, para el pin de muestra. */
+const COORDS: Record<string, [number, number]> = {
+  LHR: [51.507, -0.128], CDG: [48.857, 2.352], ZRH: [47.377, 8.541], JFK: [40.713, -74.006], DXB: [25.205, 55.271],
+  RUH: [24.714, 46.675], JED: [21.543, 39.173], MED: [24.468, 39.611], DMM: [26.428, 50.103], MAD: [40.417, -3.704],
+  BCN: [41.385, 2.173], AGP: [36.721, -4.421], SVQ: [37.389, -5.984], XRY: [36.686, -6.137], GRX: [37.177, -3.599],
+  VLC: [39.470, -0.376], LIS: [38.722, -9.139], FCO: [41.903, 12.496], FRA: [50.110, 8.682], IST: [41.008, 28.978],
+  CAI: [30.044, 31.236], DOH: [25.286, 51.531], GVA: [46.204, 6.143], MXP: [45.464, 9.190], VIE: [48.208, 16.374],
+  AMS: [52.368, 4.904], BER: [52.520, 13.405], MUC: [48.135, 11.582], RAK: [31.629, -7.981], CMN: [33.573, -7.589],
+};
+export function coordsFor(place: string): [number, number] | null {
+  const iata = iataFor(place);
+  return iata ? (COORDS[iata] ?? null) : null;
+}
 
 /**
  * Datos de apoyo para el entorno de pruebas. Con un proveedor real, las horas ya llevan su

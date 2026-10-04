@@ -48,6 +48,25 @@ export class WhatsAppChannel implements Channel {
     });
   }
 
+  /** Tarjeta: botones de respuesta con la foto como cabecera (el enlace debe ser público, HTTPS). */
+  sendPhoto(to: string, url: string, caption: string, buttons: Button[] = []) {
+    if (!buttons.length) return this.post({ to, type: "image", image: { link: url, caption: clip(caption, 1024) } });
+    return this.post({
+      to,
+      type: "interactive",
+      interactive: {
+        type: "button",
+        header: { type: "image", image: { link: url } },
+        body: { text: clip(caption, 1024) },
+        action: { buttons: buttons.slice(0, 3).map((b) => ({ type: "reply", reply: { id: b.id, title: clip(b.title, 20) } })) },
+      },
+    });
+  }
+
+  sendLocation(to: string, lat: number, lon: number, title: string) {
+    return this.post({ to, type: "location", location: { latitude: lat, longitude: lon, name: clip(title, 100) } });
+  }
+
   /** Lista de hasta 10 filas; título de fila máx. 24 caracteres, botón máx. 20. */
   sendList(to: string, body: string, label: string, rows: Row[]) {
     return this.post({

@@ -57,6 +57,19 @@ export class TelegramChannel implements Channel {
     }).then(() => undefined);
   }
 
+  sendPhoto(to: string, url: string, caption: string, buttons: Button[] = []) {
+    return this.call("sendPhoto", {
+      chat_id: to,
+      photo: url,
+      caption: clip(caption, 1024),
+      ...(buttons.length ? { reply_markup: { inline_keyboard: buttons.map((b) => [{ text: clip(b.title, 60), callback_data: b.id }]) } } : {}),
+    }).then(() => undefined);
+  }
+
+  sendLocation(to: string, lat: number, lon: number, title: string) {
+    return this.call("sendVenue", { chat_id: to, latitude: lat, longitude: lon, title: clip(title, 100), address: "📍" }).then(() => undefined);
+  }
+
   /** Botones en línea, uno por fila (en el móvil se leen mejor que varios en una fila). */
   sendButtons(to: string, body: string, buttons: Button[]) {
     return this.call("sendMessage", {

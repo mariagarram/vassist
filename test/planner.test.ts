@@ -6,8 +6,8 @@ type Ctx = ReturnType<typeof setup>;
 type Choice = Extract<Sent, { options: unknown[] }>;
 
 const last = (c: Ctx): Choice => {
-  const m = [...c.channel.sent].reverse().find((s) => s.kind === "buttons" || s.kind === "list");
-  assert.ok(m && (m.kind === "buttons" || m.kind === "list"));
+  const m = [...c.channel.sent].reverse().find((s) => s.kind === "buttons" || s.kind === "list" || s.kind === "photo");
+  assert.ok(m && (m.kind === "buttons" || m.kind === "list" || m.kind === "photo"));
   return m as Choice;
 };
 const ids = (c: Ctx) => last(c).options.map((o) => o.id);
@@ -119,15 +119,79 @@ test("planificador: ofrece hoteles y apartamentos y «Reservar» crea la propues
   assert.ok(list.options[0]!.id.startsWith("p:b:"));
   await c.click(list.options[0]!.id);
   assert.deepEqual(ids(c), ["p:bk:0", "p:bl"]);
-  assert.match(last(c).body, /free cancellation|EUR/);
+  // tarjeta visual: pin del mapa y foto de muestra con los botones
+  assert.equal(last(c).kind, "photo");
+  assert.match((last(c) as { url: string }).url, /^https:\/\//);
+  assert.ok(c.channel.sent.some((s) => s.kind === "location"));
+  assert.match(last(c).body, /Sample data/);
   await c.click("p:bk:0");
   const [proposal] = c.store.listProposals(CLIENT);
   assert.equal(proposal!.kind, "hotel");
   assert.equal(proposal!.status, "approved");
   assert.ok(String(proposal!.attrs.starts_at).includes("T15:00:00"));
-  assert.ok(texts(c).some((x) => /booking request is sent/.test(x)));
   assert.match(c.alerts.at(-1)!.text, new RegExp(`/confirm ${proposal!.id}`));
   // un segundo toque no duplica la reserva
   await c.click("p:bk:0");
   assert.equal(c.store.listProposals(CLIENT).length, 1);
+});
+
+async function planUntilStays(c: Ctx) {
+  await c.text("hello");
+  await tap(c, "m:plan");
+  await c.text("Granada");
+  await c.text("Malaga");
+  for (let q = 2; q < 12; q++) {
+    if (q === 10) {
+      await pick(c, 1);
+      await tap(c, "p:10:d");
+    } else await pick(c, 0);
+  }
+  await pick(c, 0);
+  c.llm.queue(say("Plan text."));
+  await tap(c, "p:go");
+  await tap(c, "p:st");
+  await c.click(last(c).options[0]!.id);
+}
+
+test("reserva automática: «Reservar» confirma al momento, sin María, y programa recordatorios", async () => {
+  const c = setup({ autoBook: true });
+  await planUntilStays(c);
+  await c.click("p:bk:0");
+  const [p] = c.store.listProposals(CLIENT);
+  assert.ok(p!.confirmed);
+  assert.match(texts(c).at(-1)!, /Booked: .*Reference SIM-.*TEST MODE/s);
+  assert.equal(c.alerts.length, 0, "María no recibe nada si todo va bien");
+  assert.equal(c.store.listReminders(p!.id).length, 2);
+});
+
+test("si la reserva automática falla, el cliente lo sabe y María recibe un aviso urgente", async () => {
+  const c = setup({ autoBook: true });
+  const { providers } = await import("../src/core/providers");
+  const orig = providers.book;
+  providers.book = async () => ({ ok: false, reason: "payment declined" });
+  try {
+    await planUntilStays(c);
+    await c.click("p:bk:0");
+  } finally {
+    providers.book = orig;
+  }
+  const [p] = c.store.listProposals(CLIENT);
+  assert.ok(!p!.confirmed);
+  assert.match(texts(c).at(-1)!, /could not complete the booking/);
+  assert.equal(c.alerts.at(-1)!.severity, "high");
+  assert.match(c.alerts.at(-1)!.text, /FALLO.*payment declined.*\/confirm .*\/decline/s);
+});
+
+test("restaurante: el cliente lo solicita, María recibe la petición y /decline o /confirm avisan al cliente", async () => {
+  const c = setup({ autoBook: true });
+  await c.text("hello");
+  c.llm.queue(useTool("create_proposal", { kind: "restaurant", title: "Dinner at La Mesa", details: "Fri 21:00, 2 people", amount_eur: 80 }), say("Here is a dinner option."));
+  await c.text("book me a dinner in Granada");
+  const id = c.store.listProposals(CLIENT)[0]!.id;
+  await c.click(`ap:${id}`);
+  assert.match(texts(c).at(-1)!, /Maria will contact/);
+  assert.match(c.alerts.at(-1)!.text, new RegExp(`PETICIÓN.*/confirm ${id}.*/decline ${id}`, "s"));
+  await c.owner(`/decline ${id}`);
+  assert.ok(c.channel.sent.some((m) => m.kind === "text" && m.to === CLIENT && /not possible/.test(m.text)));
+  assert.equal(c.store.getProposal(id)!.status, "rejected");
 });

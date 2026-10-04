@@ -219,8 +219,7 @@ const TX = {
     digitalKey: "digital key",
     km: "km from the centre",
     total: (n: number, eur: number) => `${n} night${n === 1 ? "" : "s"}: EUR ${eur}`,
-    booked: "Your booking request is sent. Maria completes the booking with the provider and confirms it here. Nothing is charged by this assistant.",
-    sample: "Prices and availability are sample data until a live provider is connected.",
+    sample: "Sample data: price, photo and map pin are for testing until a live provider is connected.",
   },
   ar: {
     start: "لنخطط لرحلتكم. سأطرح بضعة أسئلة، وما عليكم سوى الضغط على إجاباتكم.",
@@ -255,8 +254,7 @@ const TX = {
     digitalKey: "مفتاح رقمي",
     km: "كم عن المركز",
     total: (n: number, eur: number) => `${n} ليلة: ${eur} يورو`,
-    booked: "تم إرسال طلب الحجز. ستُتم ماريا الحجز لدى المزوّد وتؤكده هنا. لا يخصم هذا المساعد أي مبلغ.",
-    sample: "الأسعار والتوافر بيانات تجريبية إلى أن يُربط مزوّد حقيقي.",
+    sample: "بيانات تجريبية: السعر والصورة وموقع الخريطة للاختبار إلى أن يُربط مزوّد حقيقي.",
   },
 };
 
@@ -528,10 +526,24 @@ export class Planner {
     ]
       .filter(Boolean)
       .join("\n");
-    await this.h.channel.sendButtons(user.id, body, [
+    const buttons = [
       { id: `p:bk:${idx}`, title: tx.book },
       { id: "p:bl", title: tx.back },
-    ]);
+    ];
+    const ch = this.h.channel;
+    // Tarjeta visual: pin del mapa y foto con los botones. Si el canal no los admite o fallan, texto y botones.
+    if (ch.sendLocation && h.lat !== undefined && h.lon !== undefined) {
+      await ch.sendLocation(user.id, h.lat, h.lon, h.name).catch(() => {});
+    }
+    if (ch.sendPhoto && h.imageUrl) {
+      try {
+        await ch.sendPhoto(user.id, h.imageUrl, body, buttons);
+        return true;
+      } catch {
+        /* sigue con texto */
+      }
+    }
+    await ch.sendButtons(user.id, body, buttons);
     return true;
   }
 
@@ -561,7 +573,6 @@ export class Planner {
     });
     // Un segundo toque sobre «Reservar» no debe crear otra reserva.
     this.stays.get(user.id)!.shown[idx] = undefined as unknown as Stay;
-    await this.h.channel.sendText(user.id, tx.booked);
     await this.h.approve(user, proposal.id);
     return true;
   }

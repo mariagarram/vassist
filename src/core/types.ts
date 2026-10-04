@@ -18,6 +18,10 @@ export interface Channel {
   sendList(to: string, body: string, label: string, rows: Row[]): Promise<void>;
   /** Pregunta abierta con recuadro de respuesta (Telegram). Si el canal no lo tiene, se usa sendText. */
   sendPrompt?(to: string, text: string, placeholder: string): Promise<void>;
+  /** Tarjeta con foto, texto y botones (opcionales). */
+  sendPhoto?(to: string, url: string, caption: string, buttons?: Button[]): Promise<void>;
+  /** Pin de ubicación que se abre en el mapa del móvil. */
+  sendLocation?(to: string, lat: number, lon: number, title: string): Promise<void>;
 }
 
 export type OwnerAlert = { severity: "info" | "high" | "urgent"; text: string };

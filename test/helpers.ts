@@ -7,7 +7,9 @@ import type { Button, Channel, Llm, OwnerAlert, Row } from "../src/core/types";
 export type Sent =
   | { kind: "text"; to: string; text: string }
   | { kind: "buttons"; to: string; body: string; options: Button[] }
-  | { kind: "list"; to: string; body: string; options: Row[] };
+  | { kind: "list"; to: string; body: string; options: Row[] }
+  | { kind: "photo"; to: string; url: string; body: string; options: Button[] }
+  | { kind: "location"; to: string; lat: number; lon: number; title: string };
 
 export class FakeChannel implements Channel {
   sent: Sent[] = [];
@@ -22,6 +24,12 @@ export class FakeChannel implements Channel {
   }
   async sendList(to: string, body: string, _label: string, options: Row[]) {
     this.sent.push({ kind: "list", to, body, options });
+  }
+  async sendPhoto(to: string, url: string, body: string, options: Button[] = []) {
+    this.sent.push({ kind: "photo", to, url, body, options });
+  }
+  async sendLocation(to: string, lat: number, lon: number, title: string) {
+    this.sent.push({ kind: "location", to, lat, lon, title });
   }
   last() {
     return this.sent[this.sent.length - 1]!;
@@ -62,7 +70,7 @@ export class ScriptedLlm implements Llm {
 export const CLIENT = "966500000001";
 export const OWNER = "34600000000";
 
-export function setup() {
+export function setup(opts: { autoBook?: boolean } = {}) {
   const store = new Store(openDb(":memory:"));
   const channel = new FakeChannel();
   const llm = new ScriptedLlm();
@@ -79,6 +87,7 @@ export function setup() {
     today: () => "2026-10-03",
     now: () => clock.now,
     ownerPhone: OWNER,
+    autoBook: opts.autoBook ?? false,
     sendOutside: async (to, text, lang) => {
       if (failOutside) throw new Error("template rejected");
       outside.push({ to, text, lang });

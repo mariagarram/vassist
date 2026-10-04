@@ -61,3 +61,15 @@ test("sendPrompt: respuesta en blanco con texto de ayuda en el recuadro", async 
   await new TelegramChannel({ token: "T", fetchImpl: impl }).sendPrompt("555", "Where to?", "City, town, region or country");
   assert.deepEqual(calls[0]!.body.reply_markup, { force_reply: true, input_field_placeholder: "City, town, region or country", selective: false });
 });
+
+test("tarjetas: foto con botones y ubicación como lugar", async () => {
+  const { calls, impl } = fakeFetch();
+  const ch = new TelegramChannel({ token: "T", fetchImpl: impl });
+  await ch.sendPhoto("555", "https://x.test/a.jpg", "Hotel", [{ id: "p:bk:0", title: "Book" }]);
+  await ch.sendLocation("555", 37.17, -3.6, "Hotel");
+  assert.match(calls[0]!.url, /sendPhoto$/);
+  assert.equal(calls[0]!.body.photo, "https://x.test/a.jpg");
+  assert.deepEqual(calls[0]!.body.reply_markup.inline_keyboard, [[{ text: "Book", callback_data: "p:bk:0" }]]);
+  assert.match(calls[1]!.url, /sendVenue$/);
+  assert.equal(calls[1]!.body.latitude, 37.17);
+});

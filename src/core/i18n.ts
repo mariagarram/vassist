@@ -103,6 +103,12 @@ type Texts = {
   suggestionDeclined: string;
   menu: MenuTexts;
   confirmed: (title: string) => string;
+  /** Reserva hecha al momento con el proveedor. */
+  autoBooked: (title: string, ref: string, simulated: boolean) => string;
+  /** Petición que gestiona María por teléfono o email con el lugar. */
+  manualRequested: (title: string) => string;
+  bookingFailed: (title: string) => string;
+  declined: (title: string) => string;
   reminder: (kind: ReminderKind, p: Proposal) => string;
 };
 
@@ -223,6 +229,14 @@ export const T: Record<Lang, Texts> = {
       hotelDetails: (n, d, s) => `${n} night${n === 1 ? "" : "s"} from ${d} · ${s} stars`,
     },
     confirmed: (t) => `Good news: ${t} is now confirmed. I will remind you before check-in.`,
+    autoBooked: (t, ref, sim) =>
+      sim
+        ? `Booked: ${t}. Reference ${ref}.\nTEST MODE: this is a simulated booking, nothing real was reserved or charged.`
+        : `Booked: ${t}. Reference ${ref}. I will remind you before check-in.`,
+    manualRequested: (t) =>
+      `Thank you. For ${t} our team needs to speak with the provider directly. Maria will contact them and write to you here. I cannot promise a time, and nothing has been charged.`,
+    bookingFailed: (t) => `I am sorry, I could not complete the booking of ${t}. I have notified Maria, who will write to you here. Nothing has been charged.`,
+    declined: (t) => `I am sorry, ${t} is not possible. Would you like me to look for an alternative?`,
     reminder: (kind, p) => {
       const a = p.attrs;
       const link = typeof a.checkin_url === "string" ? a.checkin_url : "";
@@ -351,6 +365,13 @@ export const T: Record<Lang, Texts> = {
       hotelDetails: (n, d, s) => `${n} ليالٍ ابتداءً من ${d} · ${s} نجوم`,
     },
     confirmed: (t) => `خبر سار: تم تأكيد ${t}. سأذكّركم قبل موعد تسجيل الوصول.`,
+    autoBooked: (t, ref, sim) =>
+      sim
+        ? `تم الحجز: ${t}. المرجع ${ref}.\nوضع تجريبي: هذا حجز محاكى، لم يُحجز أو يُخصم أي شيء فعلي.`
+        : `تم الحجز: ${t}. المرجع ${ref}. سأذكّركم قبل موعد تسجيل الوصول.`,
+    manualRequested: (t) => `شكراً لكم. بالنسبة إلى ${t}، يحتاج فريقنا إلى التواصل مع الجهة مباشرة. ستتواصل ماريا معهم وتكتب لكم هنا. لا أستطيع الوعد بموعد محدد، ولم يتم خصم أي مبلغ.`,
+    bookingFailed: (t) => `نعتذر، لم أتمكن من إتمام حجز ${t}. أبلغتُ ماريا وستكتب لكم هنا. لم يتم خصم أي مبلغ.`,
+    declined: (t) => `نعتذر، ${t} غير متاح. هل تودون أن أبحث عن بديل؟`,
     reminder: (kind, p) => {
       const a = p.attrs;
       const link = typeof a.checkin_url === "string" ? a.checkin_url : "";

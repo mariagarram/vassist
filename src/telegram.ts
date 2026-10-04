@@ -34,6 +34,7 @@ const app = new Vassist({
   notifyOwner: owner ? telegramOwnerNotifier(channel, owner) : async (a) => console.warn("[vassist] OWNER_PHONE sin configurar. Aviso:", a.text),
   allowed,
   ownerPhone: owner || undefined,
+  autoBook: true,
 });
 
 setInterval(() => void app.tick().catch((err) => console.error("[vassist] tick:", err)), 30_000);
