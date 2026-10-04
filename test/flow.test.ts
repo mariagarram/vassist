@@ -51,7 +51,7 @@ test("en árabe: bienvenida en árabe y el modelo recibe reply_language: ar", as
   await c.text("مرحبا");
   assert.ok(c.channel.sent[0]!.kind === "text" && /مساعدكم الشخصي للسفر/.test((c.channel.sent[0] as { text: string }).text));
   const menu = c.channel.last();
-  assert.ok(menu.kind === "list" && menu.options[0]!.title === "رحلة جديدة", "el menú sale en árabe");
+  assert.ok(menu.kind === "list" && menu.options[0]!.title === "رحلات وفنادق", "el menú sale en árabe");
   c.llm.queue(say("بالتأكيد، من أي مدينة ستسافرون؟"));
   await c.text("أريد السفر إلى لندن الأسبوع القادم");
   assert.match(c.llm.systems[0]!, /reply_language: ar/);

@@ -30,5 +30,5 @@ export interface Llm {
   }): Promise<Anthropic.Message>;
 }
 
-export type ProposalKind = "flight" | "hotel" | "restaurant" | "transfer" | "other";
+export type ProposalKind = "flight" | "hotel" | "transport" | "restaurant" | "activity" | "transfer" | "other";
 export type Attrs = Record<string, string | number | boolean>;

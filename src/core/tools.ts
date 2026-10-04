@@ -15,8 +15,8 @@ export type ToolCtx = {
   outbox: OutboxItem[];
 };
 
-const KINDS: ProposalKind[] = ["flight", "hotel", "restaurant", "transfer", "other"];
-const ATTR_KEYS = ["airline", "stops", "refundable", "stars", "city", "starts_at", "ends_at", "checkin_url", "online_checkin", "digital_key"] as const;
+const KINDS: ProposalKind[] = ["flight", "hotel", "transport", "restaurant", "activity", "transfer", "other"];
+const ATTR_KEYS = ["airline", "stops", "refundable", "stars", "city", "starts_at", "ends_at", "checkin_url", "online_checkin", "digital_key", "mode"] as const;
 const DATE_ATTRS = ["starts_at", "ends_at"];
 
 /** Herramientas del modelo. Ninguna reserva ni cobra: solo proponen. */
@@ -68,6 +68,11 @@ export const toolDefinitions: Anthropic.Tool[] = [
         hotel_min_stars: { type: "number" },
         require_online_checkin: { type: "boolean" },
         diet: { type: "string" },
+        budget: { type: "string", description: "Typical budget as the client states it, e.g. 'about 3000 EUR per trip'" },
+        transport_modes: { type: "array", items: { type: "string" }, description: "e.g. plane, train, car" },
+        interests: { type: "array", items: { type: "string" } },
+        pace: { type: "string", description: "relaxed, balanced or packed" },
+        accommodation: { type: "string", description: "e.g. boutique hotel, apartment, resort" },
         notes: { type: "string" },
       },
     },
@@ -75,7 +80,7 @@ export const toolDefinitions: Anthropic.Tool[] = [
   {
     name: "create_proposal",
     description:
-      "Create a proposal for ONE chosen option (a flight, a hotel, a restaurant...). The client receives Approve/Reject buttons. This does NOT book or charge anything. Use it only after the client has chosen an option. Always fill attrs from the option's data.",
+      "Create a proposal for ONE chosen option (a flight, a hotel, a train or car journey, an activity, a restaurant...). The client receives Approve/Reject buttons. This does NOT book or charge anything. Use it only after the client has chosen an option. Always fill attrs from the option's data.",
     input_schema: {
       type: "object",
       properties: {
@@ -98,6 +103,7 @@ export const toolDefinitions: Anthropic.Tool[] = [
             checkin_url: { type: "string", description: "Official online check-in or pre-registration link, only if known. Never invent one." },
             online_checkin: { type: "boolean", description: "The hotel offers online check-in." },
             digital_key: { type: "boolean", description: "The hotel offers a digital key on the phone." },
+            mode: { type: "string", description: "For kind 'transport': train, car, bus, ferry..." },
           },
         },
       },
@@ -167,7 +173,7 @@ export async function runTool(name: string, input: Input, ctx: ToolCtx): Promise
         return JSON.stringify(ctx.store.getPrefs(ctx.userId));
 
       case "save_preferences": {
-        const allowed = ["home_airport", "preferred_airlines", "avoid_airlines", "seat", "direct_only", "hotel_min_stars", "require_online_checkin", "diet", "notes"];
+        const allowed = ["home_airport", "preferred_airlines", "avoid_airlines", "seat", "direct_only", "hotel_min_stars", "require_online_checkin", "diet", "budget", "transport_modes", "interests", "pace", "accommodation", "notes"];
         for (const [k, v] of Object.entries(input)) if (allowed.includes(k)) ctx.store.setPref(ctx.userId, k, v);
         return JSON.stringify(ctx.store.getPrefs(ctx.userId));
       }

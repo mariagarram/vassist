@@ -192,11 +192,28 @@ test("otro destino escrito: ciudad conocida, código y desconocida", async () =>
   await tap(c, "m:new");
   await tap(c, "t:flight");
   await tap(c, "c:other");
+  // Un sitio sin aeropuerto conocido ya no es un callejón sin salida: lo sigue la IA.
+  c.llm.queue(say("Atlantis sounds fascinating. How would you like to travel, and what budget do you have in mind?"));
   await c.text("Atlantis");
-  assert.match(textsOf(c).at(-1)!, /could not match that place/);
+  assert.match(textsOf(c).at(-1)!, /Atlantis sounds fascinating/);
+  assert.equal(c.store.getWizard(CLIENT), null);
+  await c.click("m:new");
+  await tap(c, "t:flight");
+  await tap(c, "c:other");
   await c.text("geneva");
   await tap(c, "d:2026-10-04");
   assert.match(lastChoice(c).body, /Flights from RUH to GVA/);
+});
+
+test("Plan any trip: el menú pide el viaje en una frase y lo sigue la IA", async () => {
+  const c = setup();
+  await c.text("hello");
+  await tap(c, "m:plan");
+  assert.match(textsOf(c).at(-1)!, /any city, town or country/);
+  assert.equal(c.store.getWizard(CLIENT), null);
+  c.llm.queue(say("Of course. What is your approximate budget, and who is travelling?"));
+  await c.text("A weekend in Ronda by train");
+  assert.match(textsOf(c).at(-1)!, /approximate budget/);
 });
 
 test("Hablar con María avisa a María y no promete plazos", async () => {

@@ -82,6 +82,7 @@ export class Menu {
     const m = this.t(user.lang);
     await this.h.channel.sendList(user.id, m.main, m.mainLabel, [
       { id: "m:new", title: m.rowNew },
+      { id: "m:plan", title: m.rowPlan },
       { id: "m:book", title: m.rowBookings },
       { id: "m:prefs", title: m.rowPrefs },
       { id: "m:contact", title: m.rowContact(this.h.ownerName) },
@@ -97,8 +98,9 @@ export class Menu {
       case "dest_text": {
         const iata = iataFor(text);
         if (!iata) {
-          await this.h.channel.sendText(user.id, m.destBad);
-          return true;
+          // Sitio sin aeropuerto conocido (un pueblo, un país...): el menú no puede buscar vuelos, lo sigue la IA.
+          this.h.store.clearWizard(user.id);
+          return false;
         }
         await this.afterDest(user, w, /^[A-Za-z]{3}$/.test(text.trim()) ? cityFor(iata) : cap(text), iata);
         return true;
@@ -146,6 +148,11 @@ export class Menu {
     // Menú principal: vale siempre, esté o no en medio de un flujo.
     if (kind === "m") {
       if (arg === "new") await this.askType(user);
+      else if (arg === "plan") {
+        // Planificación abierta: cualquier destino y medio de transporte lo lleva la IA con el siguiente mensaje.
+        store.clearWizard(user.id);
+        await this.h.channel.sendText(user.id, m.planAsk);
+      }
       else if (arg === "book") await this.showBookings(user);
       else if (arg === "prefs") await this.showPrefs(user);
       else if (arg === "contact") await this.contact(user);

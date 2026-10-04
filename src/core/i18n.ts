@@ -18,6 +18,8 @@ export type MenuTexts = {
   main: string;
   mainLabel: string;
   rowNew: string;
+  rowPlan: string;
+  planAsk: string;
   rowBookings: string;
   rowPrefs: string;
   rowContact: (owner: string) => string;
@@ -107,7 +109,7 @@ type Texts = {
 export const T: Record<Lang, Texts> = {
   en: {
     welcome:
-      "Welcome to VASSIST, your personal travel assistant. I am an AI assistant, not a person, and I only help with travel: flights, hotels, restaurants, transfers and itineraries.\n\nNothing is ever booked or paid without your approval. Shall we plan your next trip? Where are you travelling to, and when?",
+      "Welcome to VASSIST, your personal travel assistant. I am an AI assistant, not a person, and I only help with travel, to any destination and by any means: flights, trains, car trips, hotels, restaurants, activities and itineraries.\n\nNothing is ever booked or paid without your approval. Shall we plan your next trip? Where are you travelling to, and when?",
     unsupported: "For now I can only work in writing. Could you please send your request as a text message?",
     error: "I am sorry, something went wrong on my side. I have notified the team, and we will come back to you shortly.",
     alreadyHandled: "That request has already been handled.",
@@ -146,7 +148,9 @@ export const T: Record<Lang, Texts> = {
     menu: {
       main: "How can I help you today?",
       mainLabel: "Menu",
-      rowNew: "New trip",
+      rowNew: "Flights & hotels",
+      rowPlan: "Plan any trip",
+      planAsk: "With pleasure. Tell me in one message where you would like to go (any city, town or country), roughly when, and how you would like to travel (plane, train, car, or whatever suits best). I will ask for the rest: budget, who is travelling, preferences and interests.",
       rowBookings: "My bookings",
       rowPrefs: "My preferences",
       rowContact: (o) => `Talk to ${o}`,
@@ -205,6 +209,11 @@ export const T: Record<Lang, Texts> = {
         hotel_min_stars: "Minimum hotel stars",
         require_online_checkin: "Online check-in required",
         diet: "Diet",
+        budget: "Budget",
+        transport_modes: "Preferred transport",
+        interests: "Interests",
+        pace: "Travel pace",
+        accommodation: "Accommodation",
         notes: "Notes",
       },
       yesWord: "yes",
@@ -229,7 +238,7 @@ export const T: Record<Lang, Texts> = {
   },
   ar: {
     welcome:
-      "أهلاً بكم في VASSIST، مساعدكم الشخصي للسفر. أنا مساعد آلي يعمل بالذكاء الاصطناعي ولست إنساناً، وأقتصر على خدمات السفر: الرحلات الجوية والفنادق والمطاعم والتنقلات وجداول الرحلات.\n\nلا يتم أي حجز ولا دفع دون موافقتكم. هل نبدأ بالتخطيط لرحلتكم القادمة؟ إلى أين تودّون السفر، ومتى؟",
+      "أهلاً بكم في VASSIST، مساعدكم الشخصي للسفر. أنا مساعد آلي يعمل بالذكاء الاصطناعي ولست إنساناً، وأقتصر على خدمات السفر إلى أي وجهة وبأي وسيلة: الطائرة والقطار والسيارة والفنادق والمطاعم والأنشطة وجداول الرحلات.\n\nلا يتم أي حجز ولا دفع دون موافقتكم. هل نبدأ بالتخطيط لرحلتكم القادمة؟ إلى أين تودّون السفر، ومتى؟",
     unsupported: "أعمل حالياً بالكتابة فقط. هل يمكنكم إرسال طلبكم في رسالة نصية من فضلكم؟",
     error: "نعتذر، حدث خلل من جانبنا. لقد أبلغنا الفريق وسنعود إليكم قريباً.",
     alreadyHandled: "تمت معالجة هذا الطلب مسبقاً.",
@@ -267,7 +276,9 @@ export const T: Record<Lang, Texts> = {
     menu: {
       main: "كيف يمكنني مساعدتكم اليوم؟",
       mainLabel: "القائمة",
-      rowNew: "رحلة جديدة",
+      rowNew: "رحلات وفنادق",
+      rowPlan: "تخطيط أي رحلة",
+      planAsk: "بكل سرور. أخبروني في رسالة واحدة إلى أين تودون الذهاب (أي مدينة أو بلدة أو دولة)، وفي أي وقت تقريباً، وبأي وسيلة تفضلون السفر (طائرة أو قطار أو سيارة أو ما يناسبكم). وسأسألكم عن الباقي: الميزانية وعدد المسافرين والتفضيلات والاهتمامات.",
       rowBookings: "حجوزاتي",
       rowPrefs: "تفضيلاتي",
       rowContact: (o) => `التواصل مع ${o}`,
@@ -326,6 +337,11 @@ export const T: Record<Lang, Texts> = {
         hotel_min_stars: "الحد الأدنى لنجوم الفندق",
         require_online_checkin: "تسجيل الوصول الإلكتروني مطلوب",
         diet: "النظام الغذائي",
+        budget: "الميزانية",
+        transport_modes: "وسائل النقل المفضلة",
+        interests: "الاهتمامات",
+        pace: "وتيرة السفر",
+        accommodation: "الإقامة",
         notes: "ملاحظات",
       },
       yesWord: "نعم",

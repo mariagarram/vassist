@@ -51,6 +51,10 @@ Los pasos de Meta cambian de pantalla con frecuencia; verifica cada uno en la do
 8. Crea además dos plantillas **Utility** (una en inglés y otra en árabe, una variable en el cuerpo) y ponlas en `REMINDER_TEMPLATE_EN` y `REMINDER_TEMPLATE_AR`. Sin ellas, los recordatorios solo llegan si el cliente ha escrito al bot en las últimas 24 h.
 9. `npm start`.
 
+## Planificador de viajes (cualquier destino y medio)
+
+«Plan any trip» en el menú, o escribir libremente, abre una conversación con la IA que lo pregunta todo por orden: lo básico (destino, fechas, motivo), viajeros, presupuesto, cómo llegar (avión, tren, coche, bus, ferry), alojamiento, comida, intereses y ritmo, y logística. Después resume el plan día a día con un coste estimado frente al presupuesto y, si el cliente confirma, crea las propuestas (vuelo, hotel, transporte, actividad, restaurante). Solo vuelos y hoteles tienen buscador (datos de prueba); trenes, rutas en coche y actividades salen del conocimiento del modelo, se marcan como estimaciones y los verifica María antes de confirmar. Un destino que el menú de vuelos no reconoce (un pueblo, un país) pasa solo a la IA.
+
 ## El menú (forma principal de uso)
 
 Al escribir por primera vez, o con «menu», «hi», «hello», «مرحبا», «القائمة»..., el cliente ve el menú: **Nuevo viaje · Mis reservas · Mis preferencias · Hablar con María**.
