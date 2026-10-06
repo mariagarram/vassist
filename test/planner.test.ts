@@ -13,6 +13,8 @@ const last = (c: Ctx): Choice => {
 const ids = (c: Ctx) => last(c).options.map((o) => o.id);
 /** Pulsa la opción n (0 = primera) del último menú. */
 const pick = async (c: Ctx, n: number) => c.click(last(c).options[n]!.id);
+/** Pulsa la primera opción rápida (no «fechas exactas», «otro», «saltar» ni «hecho»). */
+const quick = async (c: Ctx) => c.click(last(c).options.find((o) => !/:(o|s|d)$/.test(o.id))!.id);
 const tap = async (c: Ctx, id: string) => {
   assert.ok(ids(c).includes(id), `no hay ${id} en ${ids(c).join(", ")}`);
   await c.click(id);
@@ -25,7 +27,7 @@ async function toHub(c: Ctx, dest = "Granada", origin = "Malaga") {
   await tap(c, "m:plan");
   await c.text(dest);
   await c.text(origin);
-  await pick(c, 0); // cuándo: en 3 días
+  await quick(c); // cuándo: en 3 días
   await pick(c, 1); // noches: 4
   await pick(c, 0); // viajeros: solo yo
 }
@@ -39,8 +41,8 @@ test("planificador: solo 5 preguntas básicas y luego el panel del viaje con tod
   assert.match(texts(c).at(-1)!, /depart from/);
   await c.text("Malaga");
   assert.match(last(c).body, /^3\/5 · When/);
-  assert.equal(last(c).options[0]!.id, "p:2:0");
-  await pick(c, 0);
+  assert.equal(last(c).options[0]!.id, "p:2:o", "las fechas exactas van las primeras");
+  await quick(c);
   await pick(c, 1);
   await pick(c, 0);
   const hub = last(c);
@@ -61,7 +63,7 @@ test("el siguiente viaje no repite lo ya sabido: origen y viajeros se recuerdan"
   assert.match(texts(c).at(-1)!, /write the place/);
   await c.text("Seville");
   assert.match(last(c).body, /^2\/3 · When/);
-  await pick(c, 0);
+  await quick(c);
   await pick(c, 0);
   assert.match(last(c).body, /Destination: Seville/);
   assert.match(last(c).body, /Departing from: Malaga/);
@@ -334,4 +336,42 @@ test("los clientes que ya existían no vuelven a ver el selector de idioma", asy
   await c.text("hello");
   assert.match((last(c) as { body: string }).body, /How can I help you today/);
   assert.ok(!ids(c).includes("l:es"));
+});
+
+test("fechas exactas escritas de una vez: se entienden y no se pregunta por las noches", async () => {
+  const c = setup();
+  await c.text("hello");
+  await tap(c, "m:plan");
+  await c.text("Granada");
+  await c.text("Malaga");
+  await tap(c, "p:2:o");
+  assert.match(texts(c).at(-1)!, /for example 12 to 15 November/);
+  await c.text("del 12 al 15 de noviembre");
+  // salta directamente a viajeros (5.ª pregunta); no pregunta duración
+  assert.match(last(c).body, /^5\/5 · Who is travelling/);
+  await pick(c, 0);
+  assert.match(last(c).body, /When: 2026-11-12/);
+  assert.match(last(c).body, /Nights: 3/);
+  // los vuelos usan esas fechas
+  await tap(c, "p:fl");
+  assert.match(last(c).body, /on 2026-11-12/);
+  await tap(c, "p:hub");
+  // cambiar solo las fechas actualiza también las noches
+  await tap(c, "p:ch");
+  await tap(c, "p:c:when");
+  await tap(c, "p:0:o");
+  await c.text("2026-12-01 to 2026-12-08");
+  assert.match(last(c).body, /When: 2026-12-01/);
+  assert.match(last(c).body, /Nights: 1 week/);
+});
+
+test("una sola fecha con noches: «12 nov, 3 noches»", async () => {
+  const c = setup();
+  await c.text("hello");
+  await tap(c, "m:plan");
+  await c.text("Granada");
+  await c.text("Malaga");
+  await tap(c, "p:2:o");
+  await c.text("12 nov, 3 noches");
+  assert.match(last(c).body, /^5\/5/);
 });

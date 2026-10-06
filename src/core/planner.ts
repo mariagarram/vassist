@@ -1,4 +1,4 @@
-import { parseDate } from "./menu";
+import { parseTripDates } from "./dates";
 import { T } from "./i18n";
 import { cityFor, iataFor, offsetFor, type FlightOption, type HotelOption, type TravelProvider } from "./providers";
 import type { Store, User } from "./store";
@@ -40,6 +40,8 @@ type Q = {
   multi?: boolean;
   /** Pregunta básica: sin ella no se puede buscar. El resto son preferencias opcionales. */
   core?: boolean;
+  /** La fila «otro» va la primera (cuando lo habitual es escribir). */
+  otherFirst?: boolean;
 };
 
 const o = (v: string, en: string, ar: string): Opt => ({ v, en, ar });
@@ -52,7 +54,7 @@ const ES: Record<string, string> = {
   "Please write the city or airport you will depart from.": "Escriba la ciudad o el aeropuerto de salida.", "City or airport": "Ciudad o aeropuerto",
   "Purpose": "Motivo", "What is the purpose of the trip?": "¿Cuál es el motivo del viaje?", "Business": "Trabajo", "Medical": "Salud", "Leisure": "Ocio", "Family": "Familiar", "Event or conference": "Evento o congreso",
   "When": "Cuándo", "When would you like to travel?": "¿Cuándo le gustaría viajar?", "In 3 days": "En 3 días", "In 1 week": "En 1 semana", "In 2 weeks": "En 2 semanas", "In 1 month": "En 1 mes", "In 2 to 3 months": "En 2 o 3 meses",
-  "Exact date": "Fecha exacta", "Please write the departure date, for example 2026-11-12.": "Escriba la fecha de salida, por ejemplo 2026-11-12.",
+  "Exact dates": "Fechas exactas", "Please write your dates, for example 12 to 15 November, or 2026-11-12 to 2026-11-15. One date is fine too.": "Escriba sus fechas, por ejemplo «del 12 al 15 de noviembre» o 2026-11-12 al 2026-11-15. Con una sola fecha también vale.", "12 to 15 November": "Del 12 al 15 de noviembre",
   "Nights": "Noches", "How many nights will you stay?": "¿Cuántas noches se alojará?", "2 nights": "2 noches", "4 nights": "4 noches", "1 week": "1 semana", "10 nights": "10 noches", "2 weeks": "2 semanas",
   "Other number": "Otro número", "Please write the number of nights, for example 5.": "Escriba el número de noches, por ejemplo 5.", "Number of nights": "Número de noches",
   "Travellers": "Viajeros", "Who is travelling?": "¿Quién viaja?", "Just me": "Solo yo", "2 adults": "2 adultos", "Family with children": "Familia con niños", "Group of 3 to 5": "Grupo de 3 a 5", "Group of 6 or more": "Grupo de 6 o más",
@@ -115,7 +117,8 @@ const QS: Q[] = [
       o(addDays(c.today, 30), "In 1 month", "بعد شهر"),
       o(addDays(c.today, 75), "In 2 to 3 months", "بعد شهرين إلى ثلاثة"),
     ],
-    other: { label: { en: "Exact date", ar: "تاريخ محدد" }, ask: { en: "Please write the departure date, for example 2026-11-12.", ar: "اكتبوا تاريخ المغادرة، مثل 2026-11-12." }, placeholder: { en: "2026-11-12", ar: "2026-11-12" } },
+    otherFirst: true,
+    other: { label: { en: "Exact dates", ar: "تواريخ محددة" }, ask: { en: "Please write your dates, for example 12 to 15 November, or 2026-11-12 to 2026-11-15. One date is fine too.", ar: "اكتبوا تواريخكم، مثل 12 إلى 15 نوفمبر، أو 2026-11-12 إلى 2026-11-15. يكفي أيضاً تاريخ واحد." }, placeholder: { en: "12 to 15 November", ar: "12 إلى 15 نوفمبر" } },
   },
   {
     key: "length",
@@ -271,7 +274,7 @@ const TX = {
     rowMore: (n: number) => `More results (${n})`,
     rowBackTrip: "Back to my trip",
     changeAsk: "What would you like to change?",
-    badDate: "I could not read that date. Please use the format 2026-11-12, and a day in the future.",
+    badDate: "I could not read that date. Try for example 12 to 15 November, or 2026-11-12, and a day in the future.",
     badNights: "Please write a number of nights between 1 and 60.",
     usual: (from: string, who: string) => `I am using your usual details: from ${from}, ${who}. You can change them at any time.`,
     prefsStart: "A few optional questions so I can tailor your trips. I will remember your answers.",
@@ -331,7 +334,7 @@ const TX = {
     rowMore: (n: number) => `Más resultados (${n})`,
     rowBackTrip: "Volver a mi viaje",
     changeAsk: "¿Qué quiere cambiar?",
-    badDate: "No he podido leer esa fecha. Use el formato 2026-11-12 y un día futuro.",
+    badDate: "No he podido leer esa fecha. Pruebe por ejemplo «del 12 al 15 de noviembre» o 2026-11-12, y un día futuro.",
     badNights: "Escriba un número de noches entre 1 y 60.",
     usual: (from: string, who: string) => `Uso sus datos habituales: salida desde ${from}, ${who}. Puede cambiarlos cuando quiera.`,
     prefsStart: "Unas preguntas opcionales para ajustar sus viajes. Recordaré sus respuestas.",
@@ -391,7 +394,7 @@ const TX = {
     rowMore: (n: number) => `المزيد من النتائج (${n})`,
     rowBackTrip: "العودة إلى رحلتي",
     changeAsk: "ماذا تودون أن تغيّروا؟",
-    badDate: "لم أتمكن من قراءة هذا التاريخ. استخدموا الصيغة 2026-11-12 ويوماً في المستقبل.",
+    badDate: "لم أتمكن من قراءة هذا التاريخ. جرّبوا مثلاً 12 إلى 15 نوفمبر أو 2026-11-12، ويوماً في المستقبل.",
     badNights: "اكتبوا عدد ليالٍ بين 1 و60.",
     usual: (from: string, who: string) => `أستخدم بياناتكم المعتادة: الانطلاق من ${from}، ${who}. يمكنكم تغييرها في أي وقت.`,
     prefsStart: "بعض الأسئلة الاختيارية لأخصّص رحلاتكم. سأتذكر إجاباتكم.",
@@ -477,7 +480,11 @@ export class Planner {
     }
     const list: Row[] = all.flatMap((x, idx) => (w.sel.includes(x.v) ? [] : [{ id: `p:${w.i}:${idx}`, title: clip(tr(x, lang), 24) }]));
     if (q.multi) list.unshift({ id: `p:${w.i}:d`, title: `✓ ${tx.done}${w.sel.length ? ` (${w.sel.length})` : ""}` });
-    if (q.other && list.length < 10) list.push({ id: `p:${w.i}:o`, title: clip(tr(q.other.label, lang), 24) });
+    if (q.other && list.length < 10) {
+      const row = { id: `p:${w.i}:o`, title: clip(tr(q.other.label, lang), 24) };
+      if (q.otherFirst) list.unshift(row);
+      else list.push(row);
+    }
     if (w.opt && list.length < 10) list.push({ id: `p:${w.i}:s`, title: tx.skip });
     await this.h.channel.sendList(user.id, `${w.i + 1}/${w.seq.length} · ${tr(q.ask, lang)}`, tx.pick, list);
   }
@@ -546,12 +553,17 @@ export class Planner {
     const tx = TX[user.lang];
     let value = clip(text.trim(), 200);
     if (q.key === "when") {
-      const iso = parseDate(value, this.today());
-      if (!iso) {
+      const dates = parseTripDates(value, this.today());
+      if (!dates) {
         await this.prompt(user, q, tx.badDate);
         return true;
       }
-      value = iso;
+      // Con fechas de salida y vuelta ya se sabe cuántas noches: no se vuelve a preguntar.
+      const a = dates.nights ? { ...w.a, when: dates.from, length: String(dates.nights) } : { ...w.a, when: dates.from };
+      const skipLength = dates.nights !== undefined && w.seq[w.i + 1] === "length";
+      this.h.store.setWizard(user.id, { ...w, a, i: w.i + (skipLength ? 2 : 1), sel: [], awaiting: false });
+      await this.ask(user);
+      return true;
     }
     if (q.key === "length") {
       const n = Number.parseInt(value, 10);

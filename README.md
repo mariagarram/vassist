@@ -15,7 +15,7 @@ Asistente personal de viajes por WhatsApp, en español, inglés y árabe, solo p
 cp .env.example .env     # rellena ANTHROPIC_API_KEY (solo en este archivo, nunca en el chat)
 npm install
 npm run cli              # escribes como el cliente; un número pulsa un botón
-npm test                 # 70 pruebas con un modelo simulado (no gasta API)
+npm test                 # 74 pruebas con un modelo simulado (no gasta API)
 ```
 
 ## Probar por Telegram (más fácil que WhatsApp)
@@ -65,7 +65,7 @@ Al primer mensaje el bot pregunta el idioma con tres botones (**Español · Engl
 - **Mis preferencias de viaje:** 8 preguntas opcionales (motivo, presupuesto, transporte, alojamiento, comida, intereses, ritmo, notas) que se pueden saltar.
 - **Cambiar datos del viaje:** corrige solo un campo y vuelve al panel.
 
-Las fechas y noches escritas a mano se validan y se vuelven a pedir si no se entienden. El flujo antiguo «Vuelos y hoteles» ya no sale en el menú (lo cubre el panel), aunque su código sigue. Escribir texto libre en mitad de las preguntas las abandona y lo atiende la IA. **La cobertura depende del proveedor:** con los datos de prueba hay 8 vuelos y 8 alojamientos inventados; con un proveedor real saldrá lo que él venda, no todo el mercado (ni Airbnb, que no tiene API pública).
+**Fechas:** «Exact dates» es la primera opción y entiende lo que escribe una persona: «del 12 al 15 de noviembre», «12/11 - 15/11», «2026-11-12 to 2026-11-15», «Nov 12-15», «12 nov, 3 noches». Con salida y vuelta ya se sabe cuántas noches son y no se pregunta la duración (`src/core/dates.ts`). Si no se entiende, se vuelve a pedir con ejemplos. El flujo antiguo «Vuelos y hoteles» ya no sale en el menú (lo cubre el panel), aunque su código sigue. Escribir texto libre en mitad de las preguntas las abandona y lo atiende la IA. **La cobertura depende del proveedor:** con los datos de prueba hay 8 vuelos y 8 alojamientos inventados; con un proveedor real saldrá lo que él venda, no todo el mercado (ni Airbnb, que no tiene API pública).
 
 **Hoteles y apartamentos con «Reservar».** Lista paginada con el destino, la fecha y las noches del panel. Al tocar una, tarjeta visual: **pin de mapa** y **foto** con precio, cancelación, check-in online y los botones **Reservar** / **Volver a la lista**. Con datos de prueba la foto es genérica y el pin aproximado, y la tarjeta lo dice («Sample data»). Con un proveedor real vendrían del proveedor (o de Google Places).
 
