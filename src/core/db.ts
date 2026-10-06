@@ -42,7 +42,9 @@ CREATE TABLE IF NOT EXISTS proposals (
   status TEXT NOT NULL DEFAULT 'pending',
   created_at TEXT NOT NULL,
   decided_at TEXT,
-  confirmed_at TEXT
+  confirmed_at TEXT,
+  reference TEXT,
+  verified_at TEXT
 );
 CREATE TABLE IF NOT EXISTS ratings (
   id TEXT PRIMARY KEY,
@@ -100,6 +102,8 @@ export function openDb(path = process.env.DB_PATH ?? "data/vassist.db"): Databas
   // Bases de datos creadas antes de existir la confirmación de reservas.
   const cols = db.prepare("PRAGMA table_info(proposals)").all() as { name: string }[];
   if (!cols.some((c) => c.name === "confirmed_at")) db.exec("ALTER TABLE proposals ADD COLUMN confirmed_at TEXT");
+  if (!cols.some((c) => c.name === "reference")) db.exec("ALTER TABLE proposals ADD COLUMN reference TEXT");
+  if (!cols.some((c) => c.name === "verified_at")) db.exec("ALTER TABLE proposals ADD COLUMN verified_at TEXT");
   // Idioma elegido por el cliente. Los clientes que ya existían se dan por elegidos: no se les vuelve a preguntar.
   const ucols = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
   if (!ucols.some((c) => c.name === "lang_set")) {

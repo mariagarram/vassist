@@ -922,6 +922,8 @@ export class Planner {
         digital_key: h.digitalKey,
         starts_at: `${h.checkIn}T15:00:00${offset}`,
         ends_at: `${h.checkOut}T11:00:00${offset}`,
+        // Cancelación gratuita hasta dos días antes del check-in (dato de prueba; con proveedor real vendrá de él).
+        ...(h.freeCancellation && addDays(h.checkIn, -2) > this.today() ? { cancel_by: `${addDays(h.checkIn, -2)}T18:00:00${offset}` } : {}),
       },
     });
     v.stays[idx] = undefined as unknown as Stay;

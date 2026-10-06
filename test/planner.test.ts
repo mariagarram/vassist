@@ -263,9 +263,9 @@ test("reserva automática: «Reservar» confirma al momento, sin María, y progr
   await c.click("p:bk:0");
   const [p] = c.store.listProposals(CLIENT);
   assert.ok(p!.confirmed);
-  assert.ok(texts(c).some((x) => /Booked: .*Reference SIM-.*TEST MODE/s.test(x)));
+  assert.ok(texts(c).some((x) => /Booking confirmed[\s\S]*Reference: SIM-[\s\S]*TEST MODE/.test(x)));
   assert.equal(c.alerts.length, 0, "María no recibe nada si todo va bien");
-  assert.equal(c.store.listReminders(p!.id).length, 2);
+  assert.ok(c.store.listReminders(p!.id).length >= 2, "check-in y check-out, más la fecha límite si hay cancelación gratuita");
 });
 
 test("si la reserva automática falla, el cliente lo sabe y María recibe un aviso urgente", async () => {

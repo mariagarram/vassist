@@ -7,6 +7,7 @@ const LEAD: Record<ReminderKind, number> = {
   flight_checkin: 24 * HOUR,
   hotel_checkin: 24 * HOUR,
   hotel_checkout: 12 * HOUR,
+  cancel_deadline: 48 * HOUR,
 };
 
 const parse = (v: unknown): number | null => {
@@ -24,6 +25,8 @@ export function scheduleReminders(store: Store, p: Proposal, now: Date): number 
   const end = parse(p.attrs.ends_at);
   const plan: { kind: ReminderKind; event: number | null }[] = [];
   if (p.kind === "flight") plan.push({ kind: "flight_checkin", event: start });
+  // Fecha límite de cancelación gratuita: aviso 48 h antes.
+  if (typeof p.attrs.cancel_by === "string") plan.push({ kind: "cancel_deadline", event: parse(p.attrs.cancel_by) });
   if (p.kind === "hotel") {
     plan.push({ kind: "hotel_checkin", event: start });
     plan.push({ kind: "hotel_checkout", event: end });

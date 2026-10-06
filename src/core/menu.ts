@@ -450,7 +450,7 @@ export class Menu {
     const m = this.t(user.lang);
     const list = this.h.store.listProposals(user.id);
     if (list.length === 0) return this.h.channel.sendText(user.id, m.bookingsNone);
-    const lines = list.map((p) => `• ${p.title} · ${p.status === "pending" ? m.statusPending : p.confirmed ? m.statusConfirmed : m.statusApproved}`);
+    const lines = list.map((p) => `• ${p.title} · ${p.status === "pending" ? m.statusPending : p.confirmed ? (p.verified ? m.statusVerified : m.statusConfirmed) : m.statusApproved}${p.reference ? ` · ${m.refWord} ${p.reference}` : ""}`);
     await this.h.channel.sendText(user.id, `${m.bookingsTitle}\n${lines.join("\n")}`);
   }
 

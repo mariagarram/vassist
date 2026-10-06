@@ -5,6 +5,7 @@ import { providers as defaultProviders, type TravelProvider } from "./providers"
 import { Menu } from "./menu";
 import { Planner } from "./planner";
 import { scheduleReminders } from "./reminders";
+import { compareConfirmation, extractConfirmation } from "./verify";
 import type { Proposal, Store, User } from "./store";
 import type { OutboxItem, ToolCtx } from "./tools";
 import type { Channel, Incoming, Lang, Llm, OwnerNotifier } from "./types";
@@ -113,20 +114,21 @@ export class Vassist {
   }
 
   private isOwnerCommand(msg: Incoming): msg is Extract<Incoming, { kind: "text" }> {
-    return !!this.d.ownerPhone && msg.from === this.d.ownerPhone && msg.kind === "text" && /^\/(confirm|decline|pending)\b/i.test(msg.text.trim());
+    return !!this.d.ownerPhone && msg.from === this.d.ownerPhone && msg.kind === "text" && /^\/(confirm|decline|pending|verify)\b/i.test(msg.text.trim());
   }
 
   /** /pending lista lo aprobado sin confirmar; /confirm ID marca la reserva hecha y avisa al cliente. */
   private async onOwnerCommand(text: string) {
     const { store, channel } = this.d;
     const owner = this.d.ownerPhone!;
-    const [cmd = "", id = ""] = text.split(/\s+/);
+    const [cmd = "", id = "", ...rest] = text.split(/\s+/);
+    if (cmd.toLowerCase() === "/verify") return this.verify(text);
     if (cmd.toLowerCase() === "/pending") {
       const list = store.awaitingConfirmation();
       return channel.sendText(
         owner,
         list.length
-          ? "Pendientes de confirmar:\n" + list.map((p) => `${p.id} · ${p.userName ?? p.userId} · ${p.title} · EUR ${p.amountEur.toFixed(2)}`).join("\n")
+          ? "Pendientes de confirmar:\n" + list.map((p) => `${p.id} · ${p.userName ?? p.userId} · ${p.title} · EUR ${p.amountEur.toFixed(2)}${p.reference ? ` · ref ${p.reference}` : ""}`).join("\n")
           : "No hay nada pendiente de confirmar.",
       );
     }
@@ -137,13 +139,56 @@ export class Vassist {
       if (u) await this.tell(u.id, T[u.lang].declined(d.title), u.lang);
       return channel.sendText(owner, `Marcado como no posible: ${d.title}. Cliente avisado.`);
     }
-    const p = id ? store.confirmProposal(id) : null;
+    const ref = rest.join(" ").trim();
+    if (ref && !/^[A-Za-z0-9][A-Za-z0-9\-_/ ]{2,39}$/.test(ref)) return channel.sendText(owner, "La referencia no es válida: usa de 3 a 40 letras, números o guiones. Ejemplo: /confirm ID ABC123");
+    const p = id ? store.confirmProposal(id, ref || undefined) : null;
     if (!p) return channel.sendText(owner, "No encuentro una propuesta aprobada y sin confirmar con ese ID. Usa /pending para ver la lista.");
     const reminders = scheduleReminders(store, p, this.now());
     const user = store.getUser(p.userId);
-    if (user) await this.tell(user.id, T[user.lang].confirmed(p.title), user.lang);
+    if (user) await this.tell(user.id, T[user.lang].card(p), user.lang);
     const missing = reminders === 0 && (p.kind === "flight" || p.kind === "hotel") ? " Ojo: no tiene fechas válidas (starts_at/ends_at) o ya pasaron, así que no habrá recordatorios." : "";
-    await channel.sendText(owner, `Confirmado: ${p.title}. Cliente avisado. Recordatorios programados: ${reminders}.${missing}`);
+    const hint = ref ? "" : " Sin referencia: la próxima vez usa /confirm ID REFERENCIA, o pega el email con /verify ID para comprobarlo.";
+    await channel.sendText(owner, `Confirmado: ${p.title}. Cliente avisado. Recordatorios programados: ${reminders}.${missing}${hint}`);
+  }
+
+  /**
+   * /verify ID + el texto del email de confirmación pegado en el mismo mensaje. Lee el email, lo compara con lo aprobado
+   * y solo si cuadra confirma, marca la reserva como verificada y manda la tarjeta al cliente.
+   */
+  private async verify(text: string) {
+    const { store, channel } = this.d;
+    const owner = this.d.ownerPhone!;
+    const m = /^\/verify\s+(\S+)\s*([\s\S]*)$/i.exec(text);
+    const p = m ? store.getProposal(m[1]!) : undefined;
+    if (!m || !p || p.status !== "approved") return channel.sendText(owner, "No encuentro una reserva aprobada con ese ID. Usa /pending para ver la lista.");
+    const body = m[2]!.trim();
+    if (!body) return channel.sendText(owner, `Pega el texto del email de confirmación en el mismo mensaje, debajo del ID:\n/verify ${p.id}\n(texto del email)`);
+    let x;
+    try {
+      x = await extractConfirmation(this.d.llm, body);
+    } catch (err) {
+      console.error("[vassist] no se pudo leer el email de confirmación:", err);
+      x = null;
+    }
+    if (!x) return channel.sendText(owner, "No he podido leer ese email. Revisa que has pegado el texto completo, o confirma a mano con /confirm ID REFERENCIA.");
+    const check = compareConfirmation(p, x);
+    if (!check.ok) {
+      return channel.sendText(
+        owner,
+        `NO CUADRA ${p.title}:\n- ${check.problems.join("\n- ")}\nNo he avisado al cliente. Corrígelo con el proveedor, o si es correcto igualmente: /confirm ${p.id} REFERENCIA.`,
+      );
+    }
+    const wasConfirmed = p.confirmed;
+    const confirmed = wasConfirmed ? p : store.confirmProposal(p.id, x.reference!);
+    const verified = confirmed ? store.markVerified(p.id, x.reference!) : null;
+    if (!verified) return channel.sendText(owner, "No he podido marcar la reserva como verificada. Inténtalo de nuevo.");
+    const reminders = wasConfirmed ? 0 : scheduleReminders(store, verified, this.now());
+    const user = store.getUser(p.userId);
+    if (user) await this.tell(user.id, T[user.lang].card(verified), user.lang);
+    await channel.sendText(
+      owner,
+      `Verificada: ${p.title}, referencia ${x.reference}. Cliente avisado.${wasConfirmed ? "" : ` Recordatorios programados: ${reminders}.`}${check.notes.length ? `\nA tener en cuenta:\n- ${check.notes.join("\n- ")}` : ""}`,
+    );
   }
 
   private now(): Date {
@@ -269,9 +314,11 @@ export class Vassist {
         result = { ok: false, reason: err instanceof Error ? err.message : String(err) };
       }
       if (result.ok) {
-        const confirmed = store.confirmProposal(p.id);
+        let confirmed = store.confirmProposal(p.id, result.reference);
+        // La referencia de un proveedor real es la propia comprobación; una simulada no cuenta como verificada.
+        if (confirmed && !result.simulated) confirmed = store.markVerified(p.id) ?? confirmed;
         if (confirmed) scheduleReminders(store, confirmed, this.now());
-        await channel.sendText(user.id, t.autoBooked(p.title, result.reference, result.simulated));
+        await channel.sendText(user.id, t.card(confirmed ?? p, result.simulated));
         return;
       }
       await channel.sendText(user.id, t.bookingFailed(p.title));

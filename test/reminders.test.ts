@@ -48,7 +48,7 @@ test("/pending lista lo pendiente y /confirm avisa al cliente y programa 2 recor
   c.channel.clear();
   await c.owner(`/confirm ${id}`);
   const toClient = c.channel.sent.find((s) => s.to === CLIENT);
-  assert.ok(toClient?.kind === "text" && /now confirmed/.test(toClient.text));
+  assert.ok(toClient?.kind === "text" && /Booking confirmed/.test(toClient.text));
   const toOwner = c.channel.sent.find((s) => s.to === OWNER);
   assert.ok(toOwner?.kind === "text" && /Recordatorios programados: 2/.test(toOwner.text));
   assert.equal(c.store.listReminders(id).length, 2);

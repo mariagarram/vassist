@@ -19,6 +19,10 @@ export type Proposal = {
   status: ProposalStatus;
   /** María ha confirmado la reserva con el proveedor. */
   confirmed: boolean;
+  /** Referencia de la reserva dada por el proveedor. */
+  reference: string | null;
+  /** La confirmación del proveedor se ha comprobado contra lo pedido. */
+  verified: boolean;
 };
 export type SuggestionKey = "preferred_airlines" | "avoid_airlines" | "direct_only" | "hotel_min_stars";
 export type Suggestion = {
@@ -30,7 +34,7 @@ export type Suggestion = {
   status: "pending" | "accepted" | "rejected";
 };
 export type ElementRating = { kind: ProposalKind; attrs: Attrs; score: number };
-export type ReminderKind = "flight_checkin" | "hotel_checkin" | "hotel_checkout";
+export type ReminderKind = "flight_checkin" | "hotel_checkin" | "hotel_checkout" | "cancel_deadline";
 export type Reminder = { id: string; userId: string; proposalId: string; kind: ReminderKind; dueAt: string; attempts: number };
 export type Incident = { id: string; userId: string | null; severity: string; summary: string; notified: boolean };
 
@@ -149,9 +153,11 @@ export class Store {
       attrs: JSON.parse(String(r.attrs)) as Attrs,
       status: r.status as ProposalStatus,
       confirmed: r.confirmed_at != null,
+      reference: (r.reference as string | null) ?? null,
+      verified: r.verified_at != null,
     };
   }
-  createProposal(p: Omit<Proposal, "id" | "status" | "confirmed">): Proposal {
+  createProposal(p: Omit<Proposal, "id" | "status" | "confirmed" | "reference" | "verified">): Proposal {
     const id = newId();
     this.run(
       "INSERT INTO proposals (id, plan_id, user_id, kind, title, details, amount_eur, attrs, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)",
@@ -183,8 +189,13 @@ export class Store {
     return changed ? (this.getProposal(id) ?? null) : null;
   }
   /** Marca como confirmada (reservada con el proveedor) una propuesta aprobada. null si no procede. */
-  confirmProposal(id: string): Proposal | null {
-    const changed = this.run("UPDATE proposals SET confirmed_at = ? WHERE id = ? AND status = 'approved' AND confirmed_at IS NULL", now(), id);
+  confirmProposal(id: string, reference?: string): Proposal | null {
+    const changed = this.run("UPDATE proposals SET confirmed_at = ?, reference = COALESCE(?, reference) WHERE id = ? AND status = 'approved' AND confirmed_at IS NULL", now(), reference ?? null, id);
+    return changed ? (this.getProposal(id) ?? null) : null;
+  }
+  /** La confirmación se ha comprobado contra lo pedido. Guarda la referencia si se da. */
+  markVerified(id: string, reference?: string): Proposal | null {
+    const changed = this.run("UPDATE proposals SET verified_at = ?, reference = COALESCE(?, reference) WHERE id = ? AND status = 'approved' AND confirmed_at IS NOT NULL", now(), reference ?? null, id);
     return changed ? (this.getProposal(id) ?? null) : null;
   }
   /** María no ha podido conseguirlo: la propuesta aprobada pasa a rechazada. null si no procede. */

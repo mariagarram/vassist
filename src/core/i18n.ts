@@ -21,6 +21,79 @@ const when = (v: unknown) => (typeof v === "string" ? v.slice(0, 16).replace("T"
 
 const money = (n: number) => `EUR ${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+
+type CardLabels = {
+  confirmed: string;
+  dates: string;
+  total: string;
+  reference: string;
+  cancelUntil: (d: string) => string;
+  noCancel: string;
+  verified: string;
+  unverified: string;
+  remind: string;
+  test: string;
+};
+const CARD: Record<Lang, CardLabels> = {
+  en: {
+    confirmed: "Booking confirmed",
+    dates: "Dates",
+    total: "Total",
+    reference: "Reference",
+    cancelUntil: (d) => `Free cancellation until ${d}`,
+    noCancel: "No free cancellation listed: please check the conditions before any change",
+    verified: "Checked against the provider's confirmation",
+    unverified: "Not yet checked against the provider's confirmation",
+    remind: "I will remind you before check-in and before any cancellation deadline.",
+    test: "TEST MODE: simulated booking, nothing real was reserved or charged.",
+  },
+  es: {
+    confirmed: "Reserva confirmada",
+    dates: "Fechas",
+    total: "Total",
+    reference: "Referencia",
+    cancelUntil: (d) => `Cancelación gratuita hasta el ${d}`,
+    noCancel: "Sin cancelación gratuita indicada: revise las condiciones antes de cualquier cambio",
+    verified: "Comprobada con la confirmación del proveedor",
+    unverified: "Aún sin comprobar con la confirmación del proveedor",
+    remind: "Le avisaré antes del check-in y antes de cualquier fecha límite de cancelación.",
+    test: "MODO DE PRUEBA: reserva simulada, no se ha reservado ni cobrado nada real.",
+  },
+  ar: {
+    confirmed: "تم تأكيد الحجز",
+    dates: "التواريخ",
+    total: "الإجمالي",
+    reference: "المرجع",
+    cancelUntil: (d) => `إلغاء مجاني حتى ${d}`,
+    noCancel: "لا يوجد إلغاء مجاني: راجعوا الشروط قبل أي تغيير",
+    verified: "تم التحقق من تأكيد المزوّد",
+    unverified: "لم يتم التحقق بعد من تأكيد المزوّد",
+    remind: "سأذكّركم قبل تسجيل الوصول وقبل أي موعد نهائي للإلغاء.",
+    test: "وضع تجريبي: حجز محاكى، لم يُحجز أو يُخصم أي شيء فعلي.",
+  },
+};
+
+const day = (v: unknown) => (typeof v === "string" ? v.slice(0, 10) : "");
+
+/** Tarjeta de confirmación: todo lo que el cliente necesita saber de una reserva, en un solo mensaje. */
+function cardText(L: CardLabels, p: Proposal, simulated = false): string {
+  const a = p.attrs;
+  const start = day(a.starts_at);
+  const end = day(a.ends_at);
+  const lines = [
+    `✔ ${L.confirmed}`,
+    p.title,
+    p.details,
+    start ? `${L.dates}: ${start}${end && end !== start ? ` → ${end}` : ""}` : "",
+    `${L.total}: ${money(p.amountEur)}`,
+    p.reference ? `${L.reference}: ${p.reference}` : "",
+    typeof a.cancel_by === "string" ? L.cancelUntil(when(a.cancel_by)) : p.kind === "hotel" ? L.noCancel : "",
+    simulated ? L.test : p.verified ? L.verified : L.unverified,
+    L.remind,
+  ];
+  return lines.filter(Boolean).join("\n");
+}
+
 export type MenuTexts = {
   main: string;
   mainLabel: string;
@@ -74,6 +147,8 @@ export type MenuTexts = {
   statusPending: string;
   statusApproved: string;
   statusConfirmed: string;
+  statusVerified: string;
+  refWord: string;
   prefsNone: string;
   prefsTitle: string;
   prefsFooter: string;
@@ -110,9 +185,8 @@ type Texts = {
   suggestionAccepted: string;
   suggestionDeclined: string;
   menu: MenuTexts;
-  confirmed: (title: string) => string;
-  /** Reserva hecha al momento con el proveedor. */
-  autoBooked: (title: string, ref: string, simulated: boolean) => string;
+  /** Tarjeta de confirmación: referencia, fechas, importe y fecha límite de cancelación. */
+  card: (p: Proposal, simulated?: boolean) => string;
   /** Petición que gestiona María por teléfono o email con el lugar. */
   manualRequested: (title: string) => string;
   bookingFailed: (title: string) => string;
@@ -212,6 +286,8 @@ export const T: Record<Lang, Texts> = {
       statusPending: "waiting for your approval",
       statusApproved: "approved, being confirmed",
       statusConfirmed: "confirmed",
+      statusVerified: "confirmed and verified",
+      refWord: "Ref",
       prefsNone: "I have no saved preferences yet. Tell me what you prefer, for example: I like window seats and hotels with online check-in.",
       prefsTitle: "Your preferences:",
       prefsFooter: "To change any of them, just write to me.",
@@ -237,11 +313,7 @@ export const T: Record<Lang, Texts> = {
       flightTitle: (f, t, d, a) => `Flight ${f} to ${t}, ${d}, ${a}`,
       hotelDetails: (n, d, s) => `${n} night${n === 1 ? "" : "s"} from ${d} · ${s} stars`,
     },
-    confirmed: (t) => `Good news: ${t} is now confirmed. I will remind you before check-in.`,
-    autoBooked: (t, ref, sim) =>
-      sim
-        ? `Booked: ${t}. Reference ${ref}.\nTEST MODE: this is a simulated booking, nothing real was reserved or charged.`
-        : `Booked: ${t}. Reference ${ref}. I will remind you before check-in.`,
+    card: (p, sim) => cardText(CARD.en, p, sim),
     manualRequested: (t) =>
       `Thank you. For ${t} our team needs to speak with the provider directly. Maria will contact them and write to you here. I cannot promise a time, and nothing has been charged.`,
     bookingFailed: (t) => `I am sorry, I could not complete the booking of ${t}. I have notified Maria, who will write to you here. Nothing has been charged.`,
@@ -256,6 +328,8 @@ export const T: Record<Lang, Texts> = {
           return `Reminder: ${p.title}, check-in ${when(a.starts_at)}.\n${a.online_checkin === true && link ? `You can complete online check-in here: ${link}` : a.online_checkin === true ? "The hotel offers online check-in; please use the link in your booking confirmation." : "Check-in is at the reception."}${a.digital_key === true ? "\nThe hotel offers a digital key on your phone." : ""}\nIf you would like an early check-in, tell me and I will prepare the request.`;
         case "hotel_checkout":
           return `Reminder: check-out from ${p.title} is ${when(a.ends_at)}.\nIf you need a late check-out, tell me and I will prepare the request.`;
+        case "cancel_deadline":
+          return `Reminder: free cancellation for ${p.title} ends ${when(p.attrs.cancel_by)}. If your plans may change, tell me before then and I will prepare the cancellation.`;
       }
     },
   },
@@ -349,6 +423,8 @@ export const T: Record<Lang, Texts> = {
       statusPending: "pendiente de su aprobación",
       statusApproved: "aprobada, en proceso de confirmación",
       statusConfirmed: "confirmada",
+      statusVerified: "confirmada y verificada",
+      refWord: "Ref",
       prefsNone: "Todavía no tengo preferencias guardadas. Cuénteme qué prefiere, por ejemplo: me gusta el asiento de ventanilla y los hoteles con check-in online.",
       prefsTitle: "Sus preferencias:",
       prefsFooter: "Para cambiar alguna, escríbame.",
@@ -374,11 +450,7 @@ export const T: Record<Lang, Texts> = {
       flightTitle: (f, t, d, a) => `Vuelo ${f} a ${t}, ${d}, ${a}`,
       hotelDetails: (n, d, s) => `${n} noche${n === 1 ? "" : "s"} desde el ${d} · ${s} estrellas`,
     },
-    confirmed: (t) => `Buenas noticias: ${t} está confirmado. Le recordaré antes del check-in.`,
-    autoBooked: (t, ref, sim) =>
-      sim
-        ? `Reservado: ${t}. Referencia ${ref}.\nMODO DE PRUEBA: es una reserva simulada, no se ha reservado ni cobrado nada real.`
-        : `Reservado: ${t}. Referencia ${ref}. Le recordaré antes del check-in.`,
+    card: (p, sim) => cardText(CARD.es, p, sim),
     manualRequested: (t) =>
       `Gracias. Para ${t} nuestro equipo necesita hablar directamente con el proveedor. María contactará con ellos y le escribirá aquí. No puedo prometer un plazo y no se ha cobrado nada.`,
     bookingFailed: (t) => `Lo siento, no he podido completar la reserva de ${t}. He avisado a María, que le escribirá aquí. No se ha cobrado nada.`,
@@ -393,6 +465,8 @@ export const T: Record<Lang, Texts> = {
           return `Recordatorio: ${p.title}, check-in ${when(a.starts_at)}.\n${a.online_checkin === true && link ? `Puede hacer el check-in online aquí: ${link}` : a.online_checkin === true ? "El hotel ofrece check-in online; use el enlace de su confirmación de reserva." : "El check-in es en recepción."}${a.digital_key === true ? "\nEl hotel ofrece llave digital en el móvil." : ""}\nSi quiere un check-in anticipado, dígamelo y preparo la solicitud.`;
         case "hotel_checkout":
           return `Recordatorio: el check-out de ${p.title} es ${when(a.ends_at)}.\nSi necesita un check-out tardío, dígamelo y preparo la solicitud.`;
+        case "cancel_deadline":
+          return `Recordatorio: la cancelación gratuita de ${p.title} termina el ${when(p.attrs.cancel_by)}. Si sus planes pueden cambiar, dígamelo antes y preparo la cancelación.`;
       }
     },
   },
@@ -486,6 +560,8 @@ export const T: Record<Lang, Texts> = {
       statusPending: "بانتظار موافقتكم",
       statusApproved: "تمت الموافقة، قيد التأكيد",
       statusConfirmed: "مؤكدة",
+      statusVerified: "مؤكدة وتم التحقق منها",
+      refWord: "المرجع",
       prefsNone: "لا توجد لدي تفضيلات محفوظة بعد. أخبروني بما تفضلون، مثل: أفضّل مقاعد النافذة والفنادق التي توفر تسجيل وصول إلكترونياً.",
       prefsTitle: "تفضيلاتكم:",
       prefsFooter: "لتغيير أي منها، اكتبوا لي ببساطة.",
@@ -511,11 +587,7 @@ export const T: Record<Lang, Texts> = {
       flightTitle: (f, t, d, a) => `رحلة ${f} إلى ${t}، ${d}، ${a}`,
       hotelDetails: (n, d, s) => `${n} ليالٍ ابتداءً من ${d} · ${s} نجوم`,
     },
-    confirmed: (t) => `خبر سار: تم تأكيد ${t}. سأذكّركم قبل موعد تسجيل الوصول.`,
-    autoBooked: (t, ref, sim) =>
-      sim
-        ? `تم الحجز: ${t}. المرجع ${ref}.\nوضع تجريبي: هذا حجز محاكى، لم يُحجز أو يُخصم أي شيء فعلي.`
-        : `تم الحجز: ${t}. المرجع ${ref}. سأذكّركم قبل موعد تسجيل الوصول.`,
+    card: (p, sim) => cardText(CARD.ar, p, sim),
     manualRequested: (t) => `شكراً لكم. بالنسبة إلى ${t}، يحتاج فريقنا إلى التواصل مع الجهة مباشرة. ستتواصل ماريا معهم وتكتب لكم هنا. لا أستطيع الوعد بموعد محدد، ولم يتم خصم أي مبلغ.`,
     bookingFailed: (t) => `نعتذر، لم أتمكن من إتمام حجز ${t}. أبلغتُ ماريا وستكتب لكم هنا. لم يتم خصم أي مبلغ.`,
     declined: (t) => `نعتذر، ${t} غير متاح. هل تودون أن أبحث عن بديل؟`,
@@ -529,6 +601,8 @@ export const T: Record<Lang, Texts> = {
           return `تذكير: ${p.title}، تسجيل الوصول ${when(a.starts_at)}.\n${a.online_checkin === true && link ? `يمكنكم إتمام تسجيل الوصول عبر الإنترنت من هنا: ${link}` : a.online_checkin === true ? "يوفّر الفندق تسجيل الوصول عبر الإنترنت؛ يرجى استخدام الرابط الوارد في تأكيد الحجز." : "تسجيل الوصول يتم عند الاستقبال."}${a.digital_key === true ? "\nيوفّر الفندق مفتاحاً رقمياً على هاتفكم." : ""}\nإذا رغبتم في تسجيل وصول مبكر، أخبروني وسأجهّز الطلب.`;
         case "hotel_checkout":
           return `تذكير: موعد المغادرة من ${p.title} هو ${when(a.ends_at)}.\nإذا احتجتم إلى مغادرة متأخرة، أخبروني وسأجهّز الطلب.`;
+        case "cancel_deadline":
+          return `تذكير: ينتهي الإلغاء المجاني لـ ${p.title} في ${when(p.attrs.cancel_by)}. إذا قد تتغير خططكم، أخبروني قبل ذلك وسأجهّز الإلغاء.`;
       }
     },
   },

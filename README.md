@@ -15,7 +15,7 @@ Asistente personal de viajes por WhatsApp, en español, inglés y árabe, solo p
 cp .env.example .env     # rellena ANTHROPIC_API_KEY (solo en este archivo, nunca en el chat)
 npm install
 npm run cli              # escribes como el cliente; un número pulsa un botón
-npm test                 # 74 pruebas con un modelo simulado (no gasta API)
+npm test                 # 80 pruebas con un modelo simulado (no gasta API)
 ```
 
 ## Probar por Telegram (más fácil que WhatsApp)
@@ -74,6 +74,16 @@ Al primer mensaje el bot pregunta el idioma con tres botones (**Español · Engl
 - **Restaurantes, guías, actividades, traslados, peticiones a un hotel:** al aprobar, el cliente ve que María se pondrá en contacto con el lugar (sin prometer plazos) y a María le llega una `PETICIÓN` con los datos. Ella contacta con el lugar y responde `/confirm ID` (queda hecho, el cliente recibe el aviso) o `/decline ID` (no es posible, el cliente recibe el aviso).
 - Sin `autoBook`, vuelos y hoteles siguen el camino manual (`/confirm`).
 - Reserva y cobro reales siguen pendientes: hace falta un proveedor con reserva automática y un sistema de pago.
+
+## Confirmación de reservas verificada (lo que diferencia al bot)
+
+- **Tarjeta de confirmación** al cliente: referencia, fechas, importe, fecha límite de cancelación gratuita y si está comprobada con el proveedor, en un solo mensaje (EN/ES/AR). Es el mismo formato tanto si reserva el bot como si confirmas tú.
+- **Estado visible** en «Mis reservas»: pendiente de aprobación, aprobada, confirmada, confirmada y verificada, con la referencia.
+- **`/confirm ID REFERENCIA`**: confirma con la referencia del proveedor (la referencia se valida: 3 a 40 letras, números o guiones). Sin referencia también vale, pero la tarjeta lo dice y te sugiere comprobarlo.
+- **`/verify ID` + el texto del email de confirmación** pegado debajo, en el mismo mensaje: el bot lee el email, lo **compara con lo que aprobó el cliente** (fechas de entrada y salida o del vuelo, importe con tolerancia de 3 %, y que haya referencia) y **solo si cuadra** confirma, marca la reserva como verificada y manda la tarjeta. Si algo no cuadra te dice qué, y **no avisa al cliente**. El email se trata como dato no fiable: el modelo solo lo lee para extraer campos, sin herramientas, y cada campo se valida por código (formatos de fecha, de referencia, importe); un email con instrucciones no puede confirmar nada.
+- **Aviso de fecha límite de cancelación gratuita**, 48 h antes, además de los de check-in y check-out. Hoy el dato de prueba de cancelación es inventado; con un proveedor real vendrá de él.
+- Con reserva automática real, la referencia del proveedor cuenta como verificada; la simulada no.
+- No incluido todavía: avisos de cambios o retrasos de vuelo (necesitan un proveedor de datos de vuelos), cobro (sistema de pago homologado) y lectura automática del buzón.
 
 ## El menú (forma principal de uso)
 
